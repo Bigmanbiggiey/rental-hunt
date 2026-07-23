@@ -1,0 +1,6 @@
+# Environment variables, repo-wide (coding-standards.md §21) — never commit real
+# credentials. Each subproject (e.g. frontend/) may also keep its own, more
+# specific .gitignore; this is a repo-wide safety net.
+.env
+.env.local
+.env.*.local

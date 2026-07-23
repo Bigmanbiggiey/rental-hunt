@@ -48,6 +48,12 @@ A decision that's easily reversible, purely cosmetic, or has no real alternative
 | [ADR-016](#adr-016-github--vercel-deployment-strategy) | GitHub + Vercel deployment strategy | Accepted | 2026-07-17 | `architecture.md` §19 |
 | [ADR-017](#adr-017-current-mvp-scope) | Current MVP scope | Accepted | 2026-07-17 | `vision.md`, `requirements.md` §16 |
 | [ADR-018](#adr-018-future-extensibility-strategy) | Future extensibility strategy | Accepted | 2026-07-17 | `database.md` §15, `api-design.md` §22 |
+| [ADR-019](#adr-019-eslint-selected-over-oxlint-for-linting) | ESLint selected over oxlint for linting | Accepted | 2026-07-21 | `coding-standards.md` §3.3/§6 |
+| [ADR-020](#adr-020-eslint-plugin-import-x-selected-instead-of-eslint-plugin-import) | eslint-plugin-import-x selected instead of eslint-plugin-import | Accepted | 2026-07-21 | `coding-standards.md` §3.3 |
+| [ADR-021](#adr-021-eslint-plugin-boundaries-configuration-for-fsd-import-direction-enforcement) | eslint-plugin-boundaries configuration for FSD import-direction enforcement | Accepted | 2026-07-21 | `coding-standards.md` §3.2/§3.3, `architecture.md` §5 |
+| [ADR-022](#adr-022-sibling-feature-import-isolation-deferred-until-real-feature-slices-exist) | Sibling-feature import isolation deferred until real feature slices exist | Accepted | 2026-07-21 | `coding-standards.md` §3.2 |
+| [ADR-023](#adr-023-centralized-environment-variable-access-module) | Centralized environment-variable access module | Accepted | 2026-07-21 | `coding-standards.md` §21, `architecture.md` §5 |
+| [ADR-024](#adr-024-tailwind-v4--shadcnui-configuration-choices) | Tailwind v4 + shadcn/ui configuration choices | Accepted | 2026-07-21 | `ui-guidelines.md` §21, `coding-standards.md` §3.1/§14 |
 
 ---
 
@@ -560,6 +566,174 @@ A decision that's easily reversible, purely cosmetic, or has no real alternative
 **When To Revisit:** Each Future item, when actually greenlit, gets its own dedicated documentation-first planning pass (ADR-014) rather than being built directly against this ADR's sketch — this ADR establishes that the path is clear, not that any future design is final.
 
 **Related Documents:** `database.md` §15, `api-design.md` §22, `ui-guidelines.md` §23, `roadmap.md` §22, `user-stories.md` Epic 10.
+
+---
+
+## ADR-019: ESLint selected over oxlint for linting
+
+**Status:** Accepted
+**Date:** 2026-07-21
+
+**Decision:** The frontend uses ESLint (flat config), not oxlint, as the project's linter.
+
+**Context:** FEAT-001 (Workspace Bootstrap) scaffolded `frontend/` using Vite's current official `react-ts` template, which now defaults to `oxlint` (a Rust-based linter) instead of ESLint.
+
+**Options Considered:**
+1. Keep the scaffold's default, oxlint.
+2. Replace it with ESLint (flat config) plus the specific plugin set `coding-standards.md` already names.
+
+**Decision Drivers:** `coding-standards.md` §3.3 and §6 specifically require `@typescript-eslint/no-explicit-any`, `import/no-cycle` (or equivalent), and an FSD layer-boundary rule (`eslint-plugin-boundaries` or equivalent) — an already-approved, binding decision, not an open question.
+
+**Rationale:** oxlint, as configured by the current Vite scaffold, does not provide these specific rules in the documented form. Since `coding-standards.md` is authoritative for tooling choices already decided (`CLAUDE.md` §14), the correct move was to follow the existing documentation over a newer scaffold default, not to treat the scaffold's choice as an implicit update to the standard.
+
+**Consequences:** `oxlint` and its config file (`.oxlintrc.json`) were removed; ESLint, `@eslint/js`, `typescript-eslint`, `eslint-plugin-react-hooks`, `eslint-plugin-react-refresh`, `eslint-plugin-import-x` (ADR-020), `eslint-plugin-boundaries` (ADR-021), `eslint-config-prettier`, and `eslint-import-resolver-typescript` (ADR-021) were installed instead.
+
+**Trade-offs:** oxlint is significantly faster than ESLint; ESLint was chosen anyway because rule-set completeness and matching an already-approved standard mattered more than lint speed at this project's current size.
+
+**When To Revisit:** If oxlint's plugin ecosystem matures to cover `@typescript-eslint/no-explicit-any`-equivalent, import-cycle detection, and FSD-boundary enforcement in a form that can be verified equivalent to the current ESLint setup — a deliberate, documented switch at that point, not a silent scaffold-driven one.
+
+**Related Documents:** `coding-standards.md` §3.3, §6, §22.
+
+---
+
+## ADR-020: eslint-plugin-import-x selected instead of eslint-plugin-import
+
+**Status:** Accepted
+**Date:** 2026-07-21
+
+**Decision:** The project uses `eslint-plugin-import-x` (the community-maintained fork) for the `no-cycle` rule, not the original `eslint-plugin-import`.
+
+**Context:** `coding-standards.md` §3.3 requires `import/no-cycle` as an independent guard against import cycles, alongside the FSD layer-boundary rule.
+
+**Options Considered:**
+1. `eslint-plugin-import` — the original, long-established package `coding-standards.md` implicitly assumes by naming the rule `import/no-cycle`.
+2. `eslint-plugin-import-x` — a maintained fork with the same rule set (referenced as `import-x/no-cycle`).
+
+**Decision Drivers:** `npm install` of `eslint-plugin-import` against the project's ESLint 10 failed with an unresolvable peer-dependency conflict (`eslint-plugin-import` only declares support up to ESLint ^9). `eslint-plugin-import-x` supports ESLint 10 and implements the same rule under the `import-x/` prefix instead of `import/`.
+
+**Rationale:** `eslint-plugin-import-x` is a drop-in, actively-maintained fork created specifically to track newer ESLint releases the original package has lagged behind on. Choosing it satisfies the same documented requirement (an import-cycle guard) without pinning the whole project to an older ESLint major version to accommodate an unmaintained dependency.
+
+**Consequences:** The rule is configured as `import-x/no-cycle` rather than `import/no-cycle` in `frontend/eslint.config.js`. Any future reference to "the import-cycle rule" in this codebase means this rule under this prefix.
+
+**Trade-offs:** A slightly less well-known package name in exchange for actual ESLint 10 compatibility — the alternative (downgrading ESLint) would have meant giving up newer ESLint features/fixes to accommodate one unmaintained plugin.
+
+**When To Revisit:** If `eslint-plugin-import` resumes ESLint 10+ support and there's a concrete reason to prefer the original over its fork (e.g. the fork becomes unmaintained itself) — otherwise not worth revisiting for its own sake.
+
+**Related Documents:** `coding-standards.md` §3.3.
+
+---
+
+## ADR-021: eslint-plugin-boundaries configuration for FSD import-direction enforcement
+
+**Status:** Accepted
+**Date:** 2026-07-21
+
+**Decision:** `eslint-plugin-boundaries` v6 enforces `coding-standards.md` §3.2's downward-only FSD import direction, using the `boundaries/dependencies` rule with `mode: 'full'` element patterns and `eslint-import-resolver-typescript` wired in as the module resolver.
+
+**Context:** `coding-standards.md` §3.3 requires the import-direction rule to be "enforced by an ESLint rule ... not by convention alone." `eslint-plugin-boundaries` is the specific tool that section names as the reference implementation.
+
+**Options Considered:**
+1. Convention only, relying on code review to catch violations (explicitly rejected by §3.3's own wording).
+2. A hand-written custom ESLint rule.
+3. `eslint-plugin-boundaries`, configured per its actual (verified) API.
+
+**Decision Drivers:** §3.3 already names this exact package; writing a custom rule would duplicate a maintained tool for no benefit.
+
+**Rationale — and the specific configuration pitfalls found and worked around:**
+- The package's own bundled README "Quick Example" documents a `policies`-keyed config shape that is actually v7's API. The installed v6.0.2 validates against a different, `rules`-keyed shape instead: `{ from: { type: 'entities' }, allow: [{ to: { type: 'shared' } }] }`. Config was written and confirmed against the schema the installed version actually accepts, not the README's example, after the mismatch produced a hard ESLint config-validation error.
+- The default `mode: 'folder'` element-matching mode assumes each element has a named "slice" subfolder one level below the pattern (e.g. `entities/property/`) — it correctly classified `entities/property/*.ts` but failed to classify anything sitting directly in a layer's root (e.g. `app/App.tsx`, or any layer's placeholder `index.ts` barrel), silently leaving those files unclassified (`type: null`) and therefore unchecked by the rule. Switched every layer to `mode: 'full'` with a recursive (`src/<layer>/**`) pattern, which classifies files at any depth uniformly.
+- Without `eslint-import-resolver-typescript` configured under `settings['import/resolver']`, the plugin could not resolve extensionless/directory imports (e.g. `from '../../app'`, which resolves to `app/index.ts`) at all — the dependency's `to` descriptor came back with `path: null`, so the rule silently allowed the import rather than checking it. This is a significant silent-failure mode: without the resolver, the boundary rule does not protect barrel-style imports, which are this project's standard import pattern (`coding-standards.md` §4's barrel-file exception). Installed and wired in `eslint-import-resolver-typescript` to fix it.
+- Verified the final configuration actually catches a violation (not just that it validates) by deliberately writing a cross-layer import (`entities` → `app`) into a throwaway file, confirming ESLint reported it, then deleting the file — config validating without errors is not sufficient evidence the rule is doing anything.
+
+**Consequences:** The rule currently enforces only the coarse cross-layer direction (`shared ← entities ← features ← widgets ← {pages, routes} ← app`), including same-layer self-imports (e.g. a layer's own barrel re-exporting a sibling file within that layer). It does **not** yet enforce §3.2's sibling-feature isolation clause — see ADR-022.
+
+**Trade-offs:** None beyond the investigation cost already paid above; the resulting configuration matches the documented intent exactly, once the actual (rather than documented) plugin API was established empirically.
+
+**When To Revisit:** If `eslint-plugin-boundaries` releases a version whose bundled docs match its actual schema, re-verify this configuration is still current before assuming the README is accurate.
+
+**Related Documents:** `coding-standards.md` §3.2, §3.3, `architecture.md` §5. Superseding/extending ADR: see ADR-022 for the deferred sibling-feature rule.
+
+---
+
+## ADR-022: Sibling-feature import isolation deferred until real feature slices exist
+
+**Status:** Accepted
+**Date:** 2026-07-21
+
+**Decision:** The specific "a feature may not import a sibling feature" rule from `coding-standards.md` §3.2 is not yet implemented, despite the coarse cross-layer direction rule (ADR-021) being active. This is recorded as open technical debt (`docs/project-state.md` Technical Debt table), not silently skipped.
+
+**Context:** `coding-standards.md` §3.2 states features "may import from `entities/` and `shared/`, but never from another feature." Enforcing this in `eslint-plugin-boundaries` requires a capture-based rule keyed on the feature's slice name (e.g. `pattern: 'src/features/*/**'` with `capture: ['feature']`, then a policy disallowing `to` matches where the captured feature name differs from `from`'s).
+
+**Options Considered:**
+1. Implement the capture-based rule now, against zero or one real feature folder.
+2. Implement the coarse layer-direction rule now (ADR-021) and defer the capture-based refinement until real feature slices exist to test it against.
+
+**Decision Drivers:** The `features/` layer currently contains only a placeholder `index.ts` barrel — there is no second real feature folder yet to verify a same-slice-only rule against. Several documented-but-inaccurate config shapes were already encountered for this exact plugin while building the coarse rule (ADR-021); shipping an unverifiable capture-based rule now carries a real risk of silently not working, which is worse than not having the rule yet, since it would give false confidence.
+
+**Rationale:** A rule that cannot be meaningfully tested is not verified, and this plugin's actual API has already proven to diverge from its documentation multiple times in this session. The correct point to add and verify this rule is when Sprint 2 introduces the `AUTH-*` feature (creating at least two real feature folders alongside any other), giving a genuine positive and negative case to test against.
+
+**Consequences:** Until this is implemented, nothing in tooling prevents `features/authentication` from importing `features/property-search` (or similar) — this must be caught by self-review (`CLAUDE.md` §16) in the interim, same as before any FSD tooling existed.
+
+**Trade-offs:** A real, temporary gap in automated enforcement of one specific documented rule, versus shipping unverified lint configuration that might silently do nothing (the exact failure mode already found twice while building ADR-021's rule).
+
+**When To Revisit:** Immediately once Sprint 2 (`AUTH-*`) adds a second real feature folder — this should be one of the first tooling tasks of that sprint, not deferred indefinitely alongside the feature work itself.
+
+**Related Documents:** `coding-standards.md` §3.2, `docs/project-state.md` Technical Debt table, ADR-021.
+
+---
+
+## ADR-023: Centralized environment-variable access module
+
+**Status:** Accepted
+**Date:** 2026-07-21
+
+**Decision:** All frontend code accesses environment variables exclusively through `frontend/src/shared/config/env.ts`'s exported `env` object. No other file reads `import.meta.env` directly. `env` validates every required `VITE_` variable is present and non-empty at module-evaluation time (triggered from `app/` at bootstrap), throwing one clear error naming every missing variable if not.
+
+**Context:** FEAT-004 (Environment Configuration) needed to satisfy `coding-standards.md` §21's env-variable rules ("only `VITE_`-prefixed... exposed", secrets never in frontend code) plus a project requirement for centralized, validated, typed config access — none of which the approved docs had already pinned to one specific implementation pattern.
+
+**Options Considered:**
+1. Read `import.meta.env.VITE_X` inline, wherever a value is needed (e.g. directly inside the future Supabase client setup).
+2. A centralized module that reads and validates all required variables once, exporting a typed, pre-validated object.
+
+**Decision Drivers:** `coding-standards.md`'s general principle of centralizing a cross-cutting concern in `shared/` rather than scattering it (§3.1: `shared/` owns "the Supabase client instance" and other cross-cutting infra); a missing/misconfigured variable should fail once, loudly, and early — not silently produce `undefined` deep inside whatever code path happens to read it first.
+
+**Rationale:** Option 2 makes a missing variable a single, fast, unambiguous startup failure (verified via `vite`'s `ssrLoadModule`: a blank `.env.local` throws `Missing required environment variable(s): VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY. ...`) instead of an intermittent `undefined` surfacing wherever it happens to be read — e.g. inside a future `createClient(url, key)` call, where a missing value would produce a much less obvious failure. It also gives every future session one place to add a new required variable, rather than a convention that has to be remembered and re-applied at every call site.
+
+**Consequences:** Every future `VITE_`-prefixed variable this project adds (e.g. a future feature flag) is added to `env.ts` and `ImportMetaEnv` (`vite-env.d.ts`) rather than read ad hoc; the forthcoming Supabase client (a later ticket) will import `{ env }` from `shared/config` rather than touching `import.meta.env` itself.
+
+**Trade-offs:** None of real weight — this is a small, one-file convention with no meaningful alternative cost; the only trade-off is one indirection layer (`env.supabaseUrl` instead of `import.meta.env.VITE_SUPABASE_URL`), which is the point.
+
+**When To Revisit:** If the project ever needs environment values in a context that can't import this module (e.g. a build-time script running outside Vite's module graph) — that would need its own, separately-justified access path, not a reason to abandon this one for in-app code.
+
+**Related Documents:** `coding-standards.md` §3.1, §21, `architecture.md` §5.
+
+---
+
+## ADR-024: Tailwind v4 + shadcn/ui configuration choices
+
+**Status:** Accepted
+**Date:** 2026-07-21
+
+**Decision:** Tailwind CSS v4 and shadcn/ui are wired up using: a `@/` → `src/` path alias; a hand-authored `components.json` (style `new-york`, base color `neutral`, Radix component base, CSS-variable theming, Lucide icons) targeting `shared/ui`/`shared/lib` rather than the CLI's default `@/components`/`@/lib`; and two small corrections to `ui-guidelines.md` §21's `@theme` token snippet (adding the previously-missing `--color-card-foreground`, and new `--color-card`/`--color-destructive`(`-foreground`) aliases).
+
+**Context:** `architecture.md` §4 already decided Tailwind CSS v4 + shadcn/ui (Radix-backed) as the styling stack; `ui-guidelines.md` §21 already decided every token value. What remained undecided was how the shadcn CLI itself should be configured — this session's installed CLI (`shadcn@4.13.1`) turned out to be a substantially newer, preset-driven tool than the classic one the docs implicitly assumed, exposing choices (`--base`, `--preset`, `style`, `baseColor`) `architecture.md`/`ui-guidelines.md` don't speak to directly.
+
+**Options Considered:**
+1. Use one of the CLI's 8 bundled design presets (`nova`, `vega`, `maia`, `lyra`, `mira`, `luma`, `sera`, `rhea`) — each bundles its own opinionated color/font/icon combination.
+2. Use the CLI's newer `base: "base"` (primitive-less) or `base: "aria"` (React Aria) component engines.
+3. Use the classic `style: "new-york"` configuration with Radix primitives and CSS variables — the same convention pre-preset-era shadcn/ui projects use, and the one `architecture.md`/`coding-standards.md` were written assuming.
+
+**Decision Drivers:** `architecture.md` §14/§4 and `coding-standards.md` §14 already commit to Radix-backed primitives; `ui-guidelines.md` already fully specifies every color/spacing/radius/shadow token via its own `@theme` block, making any preset's bundled palette pure conflict-to-be-removed rather than a starting point; §10 already commits to Lucide for icons, ruling out preset combinations bundling a different icon set.
+
+**Rationale:** Every preset (option 1) pairs a specific font/color/icon combination that would have to be immediately overridden to match already-decided docs — pure churn. The newer `base`/`aria` engines (option 2) move away from Radix, contradicting `coding-standards.md` §14's explicit "Radix-backed primitives" language. Option 3 generates components referencing the standard semantic class names (`bg-primary`, `bg-card`, `bg-destructive`, `border-input`, etc.) that map directly onto tokens `ui-guidelines.md` §21 already defines, with zero preset-palette conflict to remove. `components.json`'s aliases were pointed at `shared/ui`/`shared/lib` (not the CLI's `@/components`/`@/lib` defaults) to match `coding-standards.md` §3.1's FSD layer ownership rather than fight it after the fact.
+
+**Consequences:** `ui-guidelines.md` §21 was corrected in the same change (not a separate "docs pass") to add `--color-card-foreground` (already decided in §4.1, simply not transcribed into §21's cheat-sheet) and `--color-card`/`--color-destructive`(`-foreground`) as value-identical aliases of `--color-surface`/`--color-error`(`-foreground`) — needed because shadcn's vendor component source hard-codes those exact class names, and `coding-standards.md` §14 treats vendor component internals as not-hand-edited. A `@/` path alias now exists project-wide (`tsconfig.app.json`, root `tsconfig.json` for external-tool discovery, `vite.config.ts`), which the CLI's generated imports require; existing FEAT-001 code keeps its relative-import style unchanged — both coexist, new shadcn-adjacent code uses `@/`, nothing was force-migrated.
+
+**Trade-offs:** None of real weight for the style/preset choice — option 3 has no functional downside here, only avoids preset-conflict churn. The `@/` alias adds one more resolution path a reader must know about alongside relative imports, but is the CLI's own hard assumption, not avoidable without hand-editing every generated component's imports (itself a §14 violation).
+
+**When To Revisit:** If a future session finds a real, specific reason to prefer one of the CLI's bundled presets or its newer non-Radix engines over the current approach — that would be a deliberate, documented switch (superseding this ADR), not a default reached for out of CLI-prompt convenience.
+
+**Related Documents:** `ui-guidelines.md` §21, `coding-standards.md` §3.1, §14, `architecture.md` §4, §14.
 
 ---
 

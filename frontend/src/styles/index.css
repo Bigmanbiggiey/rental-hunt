@@ -1,7 +1,123 @@
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
+@import 'tailwindcss';
+
+/*
+ * Design tokens per ui-guidelines.md §21. Two small additions beyond a literal
+ * transcription of that section, both noted in docs/decisions.md:
+ * - `--color-card`/`--color-card-foreground`: §4.1 documents "surface / card" as
+ *   one token and separately names `card-foreground`, but §21's own cheat-sheet
+ *   only transcribed `--color-surface`, omitting `card-foreground` entirely.
+ *   Added here to match §4.1's already-decided values, plus a `--color-card`
+ *   alias (identical value to `--color-surface`) since shadcn/ui's generated
+ *   components use `bg-card`/`text-card-foreground` classes by convention.
+ * - `--color-destructive`/`--color-destructive-foreground`: aliases of
+ *   `--color-error`/`--color-error-foreground`, since shadcn/ui's Button
+ *   "destructive" variant uses that class name.
+ */
+@theme {
+  /* Color */
+  --color-background: #f8fafc;
+  --color-foreground: #0f172a;
+  --color-surface: #ffffff;
+  --color-card: #ffffff;
+  --color-card-foreground: #0f172a;
+  --color-primary: #1e3a5f;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #059669;
+  --color-secondary-foreground: #ffffff;
+  --color-accent: #eff6ff;
+  --color-accent-foreground: #1e3a5f;
+  --color-muted: #f1f5f9;
+  --color-muted-foreground: #475569;
+  --color-subtle-foreground: #94a3b8;
+  --color-border: #e2e8f0;
+  --color-input: #cbd5e1;
+  --color-ring: #1e3a5f;
+  --color-success: #059669;
+  --color-warning: #d97706;
+  --color-error: #dc2626;
+  --color-error-foreground: #ffffff;
+  --color-destructive: #dc2626;
+  --color-destructive-foreground: #ffffff;
+  --color-info: #0284c7;
+
+  /* Typography */
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --text-display: 2rem;
+  --text-h1: 1.75rem;
+  --text-h2: 1.5rem;
+  --text-h3: 1.25rem;
+  --text-h4: 1.125rem;
+  --text-body: 1rem;
+  --text-body-sm: 0.875rem;
+  --text-micro: 0.75rem;
+
+  /* Spacing (subset of Tailwind default scale, documented per §6) */
+  --spacing-1: 0.25rem;
+  --spacing-2: 0.5rem;
+  --spacing-3: 0.75rem;
+  --spacing-4: 1rem;
+  --spacing-5: 1.25rem;
+  --spacing-6: 1.5rem;
+  --spacing-8: 2rem;
+  --spacing-10: 2.5rem;
+  --spacing-12: 3rem;
+  --spacing-16: 4rem;
+
+  /* Radius */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-full: 9999px;
+
+  /* Shadow */
+  --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.04);
+  --shadow-md: 0 4px 8px rgb(15 23 42 / 0.08);
+  --shadow-lg: 0 8px 24px rgb(15 23 42 / 0.12);
+  --shadow-xl: 0 16px 40px rgb(15 23 42 / 0.16);
+
+  /* Border */
+  --border-width-default: 1px;
+
+  /* Opacity (states, not colors) */
+  --opacity-disabled: 0.5;
+  --opacity-overlay: 0.6;
+
+  /* Motion */
+  --duration-fast: 150ms;
+  --duration-default: 200ms;
+  --duration-slow: 250ms;
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+}
+
+/* Dark-mode overrides (ui-guidelines.md §4.5/§21) — values ready, unused until
+   dark mode ships; the MVP is light-mode only. */
+:root[data-theme='dark'] {
+  --color-background: #0b1220;
+  --color-foreground: #f1f5f9;
+  --color-surface: #111827;
+  --color-card: #111827;
+  --color-card-foreground: #f1f5f9;
+  --color-primary: #3b6ea5;
+  --color-primary-foreground: #0b1220;
+  --color-secondary: #10b981;
+  --color-secondary-foreground: #0b1220;
+  --color-accent: #152238;
+  --color-accent-foreground: #93c5fd;
+  --color-muted: #1e293b;
+  --color-muted-foreground: #94a3b8;
+  --color-subtle-foreground: #64748b;
+  --color-border: #1f2937;
+  --color-input: #334155;
+  --color-ring: #3b6ea5;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error: #f87171;
+  --color-error-foreground: #450a0a;
+  --color-destructive: #f87171;
+  --color-destructive-foreground: #450a0a;
+  --color-info: #38bdf8;
 }
 
 html,
@@ -10,7 +126,9 @@ body,
   height: 100%;
 }
 
-body {
-  margin: 0;
-  color-scheme: light dark;
+@layer base {
+  body {
+    @apply bg-background text-foreground;
+    color-scheme: light dark;
+  }
 }

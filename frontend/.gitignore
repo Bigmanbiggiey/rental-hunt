@@ -12,6 +12,13 @@ dist
 dist-ssr
 *.local
 
+# Environment variables (coding-standards.md §21) — never commit real credentials.
+# .env.local and .env.*.local are already covered by *.local above; listed
+# explicitly for clarity, plus the bare .env case that *.local doesn't match.
+.env
+.env.local
+.env.*.local
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

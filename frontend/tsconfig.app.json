@@ -16,6 +16,11 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
+    /* Path alias — required by shadcn/ui's generated component imports */
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+
     /* Strictness (coding-standards.md §6) */
     "strict": true,
     "noUncheckedIndexedAccess": true,

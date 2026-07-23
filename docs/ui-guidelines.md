@@ -788,12 +788,16 @@ Voice: clear, professional, friendly, helpful, honest, confident (`branding.md`)
 
 A consolidated reference, expressed as the shape of a Tailwind v4 `@theme` block. This is the canonical list — every value here has already been justified in the sections above; this table exists purely as an implementation cheat-sheet.
 
+**Note (added 2026-07-21, FEAT-002):** this snippet originally omitted `--color-card-foreground` despite §4.1 already naming and valuing that token, and didn't define `--color-card`/`--color-destructive` at all. Both gaps are fixed below — `--color-card-foreground` now matches §4.1's already-decided value exactly, and `--color-card`/`--color-destructive`(`-foreground`) are added as value-identical aliases of `--color-surface`/`--color-error`(`-foreground`) so shadcn/ui's generated components (which use `bg-card`/`text-card-foreground`/`bg-destructive` class names by convention) work without hand-editing vendor component source. See `docs/decisions.md` ADR-024.
+
 ```css
 @theme {
   /* Color */
   --color-background: #F8FAFC;
   --color-foreground: #0F172A;
   --color-surface: #FFFFFF;
+  --color-card: #FFFFFF;             /* alias of --color-surface, for shadcn/ui's bg-card */
+  --color-card-foreground: #0F172A;  /* was missing despite §4.1 naming it */
   --color-primary: #1E3A5F;
   --color-primary-foreground: #FFFFFF;
   --color-secondary: #059669;
@@ -810,6 +814,8 @@ A consolidated reference, expressed as the shape of a Tailwind v4 `@theme` block
   --color-warning: #D97706;
   --color-error: #DC2626;
   --color-error-foreground: #FFFFFF;
+  --color-destructive: #DC2626;             /* alias of --color-error, for shadcn/ui's destructive variant */
+  --color-destructive-foreground: #FFFFFF;  /* alias of --color-error-foreground */
   --color-info: #0284C7;
 
   /* Typography */
