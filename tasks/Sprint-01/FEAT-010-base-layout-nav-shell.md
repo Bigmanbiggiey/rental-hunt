@@ -1,7 +1,7 @@
 # FEAT-010 — Base Layout & Navigation Shell
 
 > **Sprint:** Sprint 1 — Project Foundation
-> **Status:** In Progress — 2026-07-23
+> **Status:** Completed — 2026-07-23
 > **Priority:** Critical
 > **Derived from:** `docs/roadmap.md` §5's Configure bullets: "Base layouts: the shared page shell (header/footer regions) per `ui-guidelines.md` §7" and "Navigation shell: top nav + mobile drawer scaffold (`ui-guidelines.md` §15), with no real links behind it yet beyond placeholders." No pre-existing task file existed under this ID; drafted during implementation. This is the last unstarted item from `roadmap.md` §5.
 
