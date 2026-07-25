@@ -1,13 +1,23 @@
 import { Link } from 'react-router';
+import { toast } from 'sonner';
 import { Button, SheetClose, SheetContent, SheetHeader, SheetTitle } from '@/shared/ui';
-import type { AuthNavLink, NavLink } from './navLink.types';
+import { useAuth } from '@/entities/user';
+import { useLogout } from '@/features/authentication';
+import { PATHS } from '@/shared/config';
+import type { NavLink } from './navLink.types';
 
 interface MobileNavDrawerProps {
   primaryLinks: NavLink[];
-  authLinks: AuthNavLink[];
 }
 
-function MobileNavDrawer({ primaryLinks, authLinks }: MobileNavDrawerProps) {
+function MobileNavDrawer({ primaryLinks }: MobileNavDrawerProps) {
+  const { profile, isLoading } = useAuth();
+  const { mutate: logout, isPending: isLoggingOut } = useLogout();
+
+  const handleLogout = () => {
+    logout(undefined, { onSuccess: () => toast.success('You have been logged out.') });
+  };
+
   return (
     <SheetContent side="left" className="flex flex-col gap-6">
       <SheetHeader>
@@ -28,13 +38,30 @@ function MobileNavDrawer({ primaryLinks, authLinks }: MobileNavDrawerProps) {
       </nav>
 
       <div className="mt-auto flex flex-col gap-2">
-        {authLinks.map((link) => (
-          <SheetClose asChild key={link.to}>
-            <Button asChild variant={link.variant}>
-              <Link to={link.to}>{link.label}</Link>
-            </Button>
-          </SheetClose>
-        ))}
+        {!isLoading &&
+          (profile ? (
+            <>
+              <p className="text-body-sm text-muted-foreground px-3">{profile.fullName}</p>
+              <SheetClose asChild>
+                <Button variant="outline" onClick={handleLogout} isLoading={isLoggingOut}>
+                  Log out
+                </Button>
+              </SheetClose>
+            </>
+          ) : (
+            <>
+              <SheetClose asChild>
+                <Button asChild variant="outline">
+                  <Link to={PATHS.public.login}>Login</Link>
+                </Button>
+              </SheetClose>
+              <SheetClose asChild>
+                <Button asChild variant="default">
+                  <Link to={PATHS.public.register}>Register</Link>
+                </Button>
+              </SheetClose>
+            </>
+          ))}
       </div>
     </SheetContent>
   );

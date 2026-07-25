@@ -1,18 +1,26 @@
 import { Menu } from 'lucide-react';
 import { Link } from 'react-router';
+import { toast } from 'sonner';
 import { Button, Sheet, SheetTrigger } from '@/shared/ui';
+import { useAuth } from '@/entities/user';
+import { useLogout } from '@/features/authentication';
+import { PATHS } from '@/shared/config';
 import { MobileNavDrawer } from './MobileNavDrawer';
-import type { AuthNavLink, NavLink } from './navLink.types';
+import type { NavLink } from './navLink.types';
 
 interface HeaderProps {
   homeHref: string;
   primaryLinks: NavLink[];
-  authLinks: AuthNavLink[];
 }
 
-// Guest-state nav only (ui-guidelines.md §15.1/§15.2). Role-based states
-// (Dashboard link, Favorites/Bookings icon, Avatar menu) arrive with Sprint 2 auth.
-function Header({ homeHref, primaryLinks, authLinks }: HeaderProps) {
+function Header({ homeHref, primaryLinks }: HeaderProps) {
+  const { profile, isLoading } = useAuth();
+  const { mutate: logout, isPending: isLoggingOut } = useLogout();
+
+  const handleLogout = () => {
+    logout(undefined, { onSuccess: () => toast.success('You have been logged out.') });
+  };
+
   return (
     <header className="bg-surface border-border sticky top-0 z-40 border-b">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
@@ -39,11 +47,24 @@ function Header({ homeHref, primaryLinks, authLinks }: HeaderProps) {
         </nav>
 
         <div className="hidden items-center gap-2 lg:flex">
-          {authLinks.map((link) => (
-            <Button key={link.to} asChild variant={link.variant}>
-              <Link to={link.to}>{link.label}</Link>
-            </Button>
-          ))}
+          {!isLoading &&
+            (profile ? (
+              <>
+                <span className="text-body-sm text-muted-foreground">{profile.fullName}</span>
+                <Button variant="outline" onClick={handleLogout} isLoading={isLoggingOut}>
+                  Log out
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button asChild variant="outline">
+                  <Link to={PATHS.public.login}>Login</Link>
+                </Button>
+                <Button asChild variant="default">
+                  <Link to={PATHS.public.register}>Register</Link>
+                </Button>
+              </>
+            ))}
         </div>
 
         <Sheet>
@@ -52,7 +73,7 @@ function Header({ homeHref, primaryLinks, authLinks }: HeaderProps) {
               <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
-          <MobileNavDrawer primaryLinks={primaryLinks} authLinks={authLinks} />
+          <MobileNavDrawer primaryLinks={primaryLinks} />
         </Sheet>
       </div>
     </header>

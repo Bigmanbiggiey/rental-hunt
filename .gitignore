@@ -4,3 +4,6 @@
 .env
 .env.local
 .env.*.local
+
+# Repo-root tooling deps (Supabase CLI, added Sprint 2 — AUTH-001).
+node_modules/

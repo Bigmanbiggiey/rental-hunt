@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { Slot } from '@radix-ui/react-slot';
 import { cva, type VariantProps } from 'class-variance-authority';
+import { Loader2 } from 'lucide-react';
 
 import { cn } from '@/shared/lib/utils';
 
@@ -34,13 +35,59 @@ const buttonVariants = cva(
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {
   asChild?: boolean;
+  /**
+   * Per ui-guidelines.md §11.1's loading state: the spinner replaces the
+   * label, the label moves to `aria-label` (so it's still announced), and
+   * the button stays focusable but not actionable (`aria-disabled`, not a
+   * native `disabled` attribute that would pull it out of the tab order).
+   */
+  isLoading?: boolean;
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
+  (
+    {
+      className,
+      variant,
+      size,
+      asChild = false,
+      isLoading = false,
+      disabled,
+      children,
+      onClick,
+      ...props
+    },
+    ref,
+  ) => {
     const Comp = asChild ? Slot : 'button';
+
+    if (asChild) {
+      return (
+        <Comp
+          className={cn(buttonVariants({ variant, size, className }))}
+          ref={ref}
+          onClick={onClick}
+          {...props}
+        >
+          {children}
+        </Comp>
+      );
+    }
+
+    const isDisabled = disabled || isLoading;
+
     return (
-      <Comp className={cn(buttonVariants({ variant, size, className }))} ref={ref} {...props} />
+      <Comp
+        className={cn(buttonVariants({ variant, size, className }))}
+        ref={ref}
+        disabled={isLoading ? undefined : disabled}
+        aria-disabled={isDisabled}
+        aria-label={isLoading && typeof children === 'string' ? children : undefined}
+        onClick={isDisabled ? undefined : onClick}
+        {...props}
+      >
+        {isLoading ? <Loader2 className="animate-spin" aria-hidden="true" /> : children}
+      </Comp>
     );
   },
 );

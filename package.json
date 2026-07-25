@@ -1,0 +1,11 @@
+{
+  "name": "rental-hunt",
+  "private": true,
+  "description": "Rental Hunt KE — repository-root tooling (Supabase CLI, migrations). The application itself lives in frontend/.",
+  "scripts": {
+    "supabase": "supabase"
+  },
+  "devDependencies": {
+    "supabase": "^2.109.1"
+  }
+}
