@@ -48,6 +48,7 @@ const AUTH_ERROR_CODE_MAP: Partial<Record<string, ErrorCode>> = {
   refresh_token_already_used: 'SESSION_EXPIRED',
   session_not_found: 'UNAUTHENTICATED',
   user_not_found: 'UNAUTHENTICATED',
+  otp_expired: 'RESET_TOKEN_EXPIRED',
 };
 
 /** Postgres/PostgREST error codes mapped per api-design.md §15.3. */

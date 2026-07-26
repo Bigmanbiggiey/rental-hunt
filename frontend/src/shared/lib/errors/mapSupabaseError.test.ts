@@ -97,6 +97,15 @@ describe('mapSupabaseError', () => {
     expect(result.code).toBe('RATE_LIMITED');
   });
 
+  it('maps a Supabase Auth otp_expired error to RESET_TOKEN_EXPIRED', () => {
+    const result = mapSupabaseError({
+      code: 'otp_expired',
+      status: 403,
+      message: 'Email link is invalid or has expired',
+    });
+    expect(result.code).toBe('RESET_TOKEN_EXPIRED');
+  });
+
   it('falls back to INVALID_CREDENTIALS for an auth-shaped error with an unmapped code', () => {
     const result = mapSupabaseError({ code: 'something_unmapped', status: 400, message: 'oops' });
     expect(result.code).toBe('INVALID_CREDENTIALS');

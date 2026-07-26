@@ -1,5 +1,11 @@
 import type { RouteObject } from 'react-router';
-import { LoginPage, PlaceholderPage, RegisterPage } from '@/pages';
+import {
+  ForgotPasswordPage,
+  LoginPage,
+  PlaceholderPage,
+  RegisterPage,
+  ResetPasswordPage,
+} from '@/pages';
 import { AppLayout, type NavLink } from '@/widgets';
 import { ProtectedRoute } from '@/features/authentication';
 import { PATHS } from '@/shared/config';
@@ -15,7 +21,8 @@ export const routeConfig: RouteObject[] = [
       { path: PATHS.public.propertyDetail, element: <PlaceholderPage title="Property Details" /> },
       { path: PATHS.public.login, element: <LoginPage /> },
       { path: PATHS.public.register, element: <RegisterPage /> },
-      { path: PATHS.public.forgotPassword, element: <PlaceholderPage title="Forgot Password" /> },
+      { path: PATHS.public.forgotPassword, element: <ForgotPasswordPage /> },
+      { path: PATHS.public.resetPassword, element: <ResetPasswordPage /> },
       {
         // Any authenticated role (architecture.md §6's "Authenticated Routes").
         element: <ProtectedRoute />,

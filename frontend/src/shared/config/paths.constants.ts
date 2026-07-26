@@ -12,6 +12,7 @@ export const PATHS = {
     login: '/login',
     register: '/register',
     forgotPassword: '/forgot-password',
+    resetPassword: '/reset-password',
   },
   authenticated: {
     dashboard: '/dashboard',
