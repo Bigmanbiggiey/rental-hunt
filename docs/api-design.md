@@ -384,6 +384,32 @@ Backed entirely by Supabase Auth (`architecture.md` §7) plus the `profiles` tab
 | **Possible Errors** | `VALIDATION_ERROR`, `FORBIDDEN` (attempting to update another profile) |
 | **Authorization** | Owner only (`id = auth.uid()`), or Admin. |
 
+## 5.9 Update Email
+
+| | |
+|---|---|
+| **Purpose** | Change the signed-in user's account email (`AUTH-006`). Email is stored in `auth.users`, never in `profiles` (`database.md` §4.1) — this does not touch the `profiles` table at all. |
+| **Repository Function** | `credentialsRepository.updateEmail(newEmail: string)` |
+| **Underlying call** | `supabase.auth.updateUser({ email: newEmail })` |
+| **Request** | `{ newEmail: string }` |
+| **Response** | `{ success: true }` — the address is not live until the user confirms it via the emailed link (Supabase's default "confirm new email" flow); the UI must say so, not imply the change is immediate. |
+| **Validation** | Valid email format, same rule as registration (`api-design.md` §14). |
+| **Possible Errors** | `VALIDATION_ERROR`, `EMAIL_ALREADY_REGISTERED` (email in use by another account), `UNAUTHENTICATED` |
+| **Authorization** | Signed-in user only, acting on their own session — there is no `id` parameter, since `supabase.auth.updateUser` always targets the caller's own account. |
+
+## 5.10 Update Password
+
+| | |
+|---|---|
+| **Purpose** | Change the signed-in user's password after confirming their current one (`AUTH-006`) — distinct from §5.6's Reset Password, which is for a user who is locked out and has no current password to confirm. |
+| **Repository Function** | `credentialsRepository.updatePassword(input: { currentPassword: string, newPassword: string })` |
+| **Underlying call** | `supabase.auth.getUser()` (to read the caller's current email) → `supabase.auth.signInWithPassword({ email, password: currentPassword })` to confirm the current password is correct → `supabase.auth.updateUser({ password: newPassword })` |
+| **Request** | `{ currentPassword: string, newPassword: string }` |
+| **Response** | `{ success: true }` |
+| **Validation** | `newPassword`: same rules as registration (`api-design.md` §14). `currentPassword`: required, non-empty. |
+| **Possible Errors** | `VALIDATION_ERROR`, `INVALID_CREDENTIALS` (current password is wrong), `UNAUTHENTICATED` |
+| **Authorization** | Signed-in user only, re-confirmed via the `signInWithPassword` step above. |
+
 ---
 
 # 6. Property API

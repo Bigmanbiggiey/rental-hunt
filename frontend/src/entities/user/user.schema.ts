@@ -19,3 +19,14 @@ export const phoneSchema = z
     /^\+[1-9]\d{1,14}$/,
     'Enter a valid phone number in international format, e.g. +254712345678.',
   );
+
+/**
+ * Shared password rule (api-design.md §14), reused by every schema that
+ * accepts a new password — extracted here on its third occurrence
+ * (Register, Reset Password, Update Password) per coding-standards.md §7.
+ */
+export const passwordSchema = z
+  .string()
+  .min(8, 'Password must be at least 8 characters.')
+  .regex(/[A-Za-z]/, 'Password must include a letter.')
+  .regex(/[0-9]/, 'Password must include a number.');

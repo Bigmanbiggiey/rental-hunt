@@ -1,13 +1,10 @@
 import { z } from 'zod';
+import { passwordSchema } from '@/entities/user';
 
 /** api-design.md §5.6 — same password rules as registration. */
 export const ResetPasswordSchema = z
   .object({
-    newPassword: z
-      .string()
-      .min(8, 'Password must be at least 8 characters.')
-      .regex(/[A-Za-z]/, 'Password must include a letter.')
-      .regex(/[0-9]/, 'Password must include a number.'),
+    newPassword: passwordSchema,
     confirmPassword: z.string().min(1, 'Confirm your new password.'),
   })
   .refine((data) => data.newPassword === data.confirmPassword, {

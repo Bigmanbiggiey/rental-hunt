@@ -3,6 +3,7 @@ import {
   ForgotPasswordPage,
   LoginPage,
   PlaceholderPage,
+  ProfilePage,
   RegisterPage,
   ResetPasswordPage,
 } from '@/pages';
@@ -30,7 +31,7 @@ export const routeConfig: RouteObject[] = [
           { path: PATHS.authenticated.dashboard, element: <PlaceholderPage title="Dashboard" /> },
           { path: PATHS.authenticated.favorites, element: <PlaceholderPage title="Favorites" /> },
           { path: PATHS.authenticated.bookings, element: <PlaceholderPage title="Bookings" /> },
-          { path: PATHS.authenticated.profile, element: <PlaceholderPage title="Profile" /> },
+          { path: PATHS.authenticated.profile, element: <ProfilePage /> },
         ],
       },
       {
