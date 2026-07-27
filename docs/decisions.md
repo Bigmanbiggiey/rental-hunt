@@ -657,7 +657,7 @@ A decision that's easily reversible, purely cosmetic, or has no real alternative
 
 ## ADR-022: Sibling-feature import isolation deferred until real feature slices exist
 
-**Status:** Accepted
+**Status:** Superseded by ADR-025 (2026-07-27)
 **Date:** 2026-07-21
 
 **Decision:** The specific "a feature may not import a sibling feature" rule from `coding-standards.md` §3.2 is not yet implemented, despite the coarse cross-layer direction rule (ADR-021) being active. This is recorded as open technical debt (`docs/project-state.md` Technical Debt table), not silently skipped.
@@ -734,6 +734,73 @@ A decision that's easily reversible, purely cosmetic, or has no real alternative
 **When To Revisit:** If a future session finds a real, specific reason to prefer one of the CLI's bundled presets or its newer non-Radix engines over the current approach — that would be a deliberate, documented switch (superseding this ADR), not a default reached for out of CLI-prompt convenience.
 
 **Related Documents:** `ui-guidelines.md` §21, `coding-standards.md` §3.1, §14, `architecture.md` §4, §14.
+
+---
+
+## ADR-025: Sibling-feature import isolation implemented (supersedes ADR-022's deferral)
+
+**Status:** Accepted
+**Date:** 2026-07-27
+
+**Decision:** The `features` element descriptor in `frontend/eslint.config.js` now captures its slice-folder name (`{ type: 'features', pattern: 'src/features/*/**', mode: 'full', capture: ['feature'] }`), and the existing `features → features` allow rule now requires `captured: { feature: '{{from.feature}}' }` (the current, non-deprecated Handlebars-style template syntax — the legacy `${from.feature}` form still works but prints a migration warning) instead of a blanket allow. A feature may still import from its own slice; importing from any other feature slice now falls through to the config's `default: 'disallow'`.
+
+**Context:** ADR-022 deferred this specific rule because only one feature folder (a placeholder barrel) existed at the time, giving no real sibling case to verify against, and this exact plugin had already shown its actual v6 API diverging from its own documentation more than once. By Sprint 3 kickoff, two real feature slices existed (`authentication`, `profile-management`), and a third (`property-search`) was about to be added — ADR-022 itself named "Sprint 2 adds a second feature" as the revisit trigger, and `docs/project-state.md`'s Next Recommended Action independently flagged this as the first Sprint 3 tooling task.
+
+**Rationale:** Implementing the rule now, immediately before the third slice lands, means the very first `property-search` files are written under a tooling guarantee already proven against two real, independent slices — rather than retrofitting the rule later once more cross-feature coupling may have already crept in unnoticed. Verified the same way ADR-021's coarse rule was verified: a real throwaway file inside `features/authentication` importing from `features/profile-management` was confirmed to fail lint (`boundaries/dependencies`), and a same-slice throwaway import was confirmed to pass, before both were deleted — not just that the config validated without error.
+
+**Consequences:** `docs/project-state.md`'s Technical Debt table row is marked resolved. `frontend/eslint.config.js` is the only file changed; no application code needed to move, since no existing feature actually imported a sibling's internals.
+
+**Trade-offs:** None found — this closes a real, previously-flagged gap with no functional downside; the plugin's capture/template mechanism worked exactly as its compiled source (not just its README) indicated it should.
+
+**When To Revisit:** N/A — this is the closing entry for ADR-022, not itself expected to be revisited absent a future FSD restructuring.
+
+**Related Documents:** `coding-standards.md` §3.2, ADR-021, ADR-022 (superseded), `docs/project-state.md` Technical Debt table.
+
+---
+
+## ADR-026: `propertyRepository` lives in `entities/property`, not `features/property-search`
+
+**Status:** Accepted
+**Date:** 2026-07-27
+
+**Decision:** `entities/property/property.repository.ts` (and `referenceData.repository.ts`) hold the actual Supabase queries for reading properties/reference data. `features/property-search` owns only the URL-filter parsing, the Service that calls the entity's repository, and the search/filter/sort UI — it does not define its own repository.
+
+**Context:** `architecture.md` §5's own examples list a Repository as something a `features/` slice owns, and the plan going into this sprint initially assumed `propertyRepository` would live in `features/property-search/repositories/`. But this project already has a precedent for exactly this call: `profile.repository.ts` lives in `entities/user/`, not `features/authentication/`, because `api-design.md` §3's Resource Overview lists Profiles' primary consumers as "all authenticated roles" — cross-cutting, not owned by one feature.
+
+**Decision Drivers:** Properties are at least as cross-cutting as Profiles. `docs/roadmap.md` §8/§9/§10 (Sprints 4–7: Property Details, Favorites, Agent Dashboard, Verification) will all need `propertyRepository.getBySlug`/`list`/etc. from features that must never import each other (`coding-standards.md` §3.2, ADR-025). Putting the repository in `features/property-search` now would force Sprint 4's Property Details feature to either duplicate it or import across a feature boundary the sibling-isolation rule (ADR-025) exists specifically to block.
+
+**Rationale:** `entities/` is the layer every feature is allowed to depend on (`coding-standards.md` §3.2's FSD direction rule already permits `features → entities`), which is exactly the shape a cross-cutting Repository needs. This isn't a new pattern being invented — it's applying the same placement logic Sprint 2 already established for `profiles`, consistently, to the entity that turns out to have the same cross-cutting shape.
+
+**Consequences:** `features/property-search` only ever imports `entities/property` (already-allowed) rather than needing any new dependency-direction exception. Sprint 4 extends `PropertyRepository`'s interface (adding `getBySlug`) in place, rather than creating a second, competing repository.
+
+**Trade-offs:** None of real weight — `entities/property` was always going to need `Property`/`Amenity` types and a mapper regardless of where the repository lived; colocating the repository alongside them is the lower-friction choice, not a compromise.
+
+**When To Revisit:** If a future sprint's Repository method turns out to be genuinely feature-specific (e.g. an Agent Dashboard-only aggregate query with no other consumer), that one method — not the whole repository — would be a candidate to move into that feature's own slice.
+
+**Related Documents:** `entities/user/profile.repository.ts` (the precedent), `coding-standards.md` §3.2, `architecture.md` §5, `docs/roadmap.md` §8-§10.
+
+---
+
+## ADR-027: Amenities AND-filtering via a dedicated SQL function; cursor generalized beyond `{createdAt, id}`
+
+**Status:** Accepted
+**Date:** 2026-07-27
+
+**Decision:** Two real, previously-unspecified gaps were found and closed while implementing Sprint 3's search/filter/sort, both documented in `database.md`/`api-design.md` in the same change rather than silently worked around:
+1. `public.property_ids_with_all_amenities(p_amenity_ids uuid[])` (new SQL function, `supabase/migrations/20260727085311_property_discovery.sql`) resolves `api-design.md` §17's "amenities use AND semantics" requirement, which a plain PostgREST query-builder chain can't express against a many-to-many join in one call.
+2. The keyset pagination cursor (`api-design.md` §16.1) generalizes its internal payload from the documented `{ createdAt, id }` to `{ sortValue, id, sort }`, since true keyset pagination requires the cursor tuple to match whatever column the active `ORDER BY` sorts on — which breaks for `sort=price_asc`/`price_desc` (`DISC-004`) under the original hardcoded shape.
+
+**Context:** Both gaps surfaced only once `DISC-003`'s combinable amenities filter and `DISC-004`'s sort options were implemented together against the real documented contract — `api-design.md` had specified the *behavior* (AND semantics; a cursor that works) without fully specifying the mechanism for either, since no prior sprint had built a filterable/sortable paginated list.
+
+**Rationale:** For (1), a `security invoker`-equivalent `stable` SQL function (no elevated privileges needed — it reads the same `property_amenities` rows the caller's own RLS already permits) called via `.rpc()` only when an amenities filter is present is simpler and more indexable than either a client-side intersection of N per-amenity queries or a Postgres array-aggregation subquery inlined into every list request. For (2), widening the cursor's *internal* shape — while keeping the external "opaque, pass back verbatim" contract completely unchanged — is a strict superset of the original design, not a breaking change to anything that could have depended on the old shape (nothing did yet; this is the first sprint to implement pagination at all).
+
+**Consequences:** `database.md` §9 documents the new function; `api-design.md` §16.1 documents the generalized cursor shape. `frontend/src/entities/property/cursor.ts` is the single place that encodes/decodes it — no other file constructs or inspects a cursor value directly.
+
+**Trade-offs:** The amenities RPC is one extra round trip only when an amenities filter is actually active (no cost to the common case). The generalized cursor is marginally more complex to reason about than a fixed pair, but the alternative — a cursor that silently produces wrong results under a non-default sort — is a correctness bug, not a simplicity trade worth taking.
+
+**When To Revisit:** If a future sprint adds a sort option that isn't a simple single-column order (e.g. relevance-ranked full-text search results), the cursor shape would need to widen again — the same generalization principle applies.
+
+**Related Documents:** `database.md` §9, §17 (via `api-design.md`), `api-design.md` §16.1, §17, `frontend/src/entities/property/cursor.ts`, `frontend/src/entities/property/property.repository.ts`.
 
 ---
 

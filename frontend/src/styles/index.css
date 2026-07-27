@@ -33,7 +33,15 @@
   --color-input: #cbd5e1;
   --color-ring: #1e3a5f;
   --color-success: #059669;
+  /* success/warning-foreground: a fixed dark value in BOTH themes, not a
+     theme-flipping pair like error/destructive — verified programmatically
+     (WCAG relative-luminance) that white text fails AA (~3.2-3.8:1) against
+     these badge colors in both light and dark mode, while --color-foreground's
+     light-mode value (#0f172a) passes comfortably (4.7-8.3:1) in both. First
+     real consumer is Sprint 3's Availability/Verification badges. */
+  --color-success-foreground: #0f172a;
   --color-warning: #d97706;
+  --color-warning-foreground: #0f172a;
   --color-error: #dc2626;
   --color-error-foreground: #ffffff;
   --color-destructive: #dc2626;
@@ -112,7 +120,9 @@
   --color-input: #334155;
   --color-ring: #3b6ea5;
   --color-success: #10b981;
+  --color-success-foreground: #0f172a;
   --color-warning: #f59e0b;
+  --color-warning-foreground: #0f172a;
   --color-error: #f87171;
   --color-error-foreground: #450a0a;
   --color-destructive: #f87171;

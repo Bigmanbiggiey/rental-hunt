@@ -781,7 +781,9 @@ Inside the same transaction, `set_property_verification()` also inserts the row 
 
 **Column-level note on `profiles.role`:** RLS cannot restrict a single column within a row-level `UPDATE` policy, so self-role-elevation is prevented by a trigger (`prevent_self_role_change()`) that raises an exception if a non-admin attempts to change their own `role`. Admins bypass the trigger.
 
-**Public agent info without exposing full profiles:** Guests need an agent's name and avatar on the property details page (`PROP-005`) without gaining broad `profiles` read access. This is served through a `security invoker` view, `public.agent_directory`, exposing only `(agent_id, agency_id, full_name, avatar_url, job_title, bio)` for active agents — never phone, email, or role.
+**Public agent info without exposing full profiles:** Guests need an agent's name and avatar on the property details page (`PROP-005`) without gaining broad `profiles` read access. This is served through a `security definer` view, `public.agent_directory`, exposing only `(agent_id, agency_id, full_name, avatar_url, job_title, bio)` for active agents — never phone, email, or role. *(Corrected 2026-07-27, Sprint 3: an earlier draft of this section said "security invoker" — an invoker-mode view would need the caller's own RLS to already permit reading `profiles`, which is exactly the access this view exists to avoid granting guests. `security definer`, matching `current_role()`/`current_agency_id()`'s existing pattern, is the only mode that achieves the view's own stated purpose.)*
+
+**Amenities AND-filtering:** `properties (amenities)` filtering (§17 of `api-design.md`) requires "has ALL of these amenities" semantics against the `property_amenities` many-to-many join — not expressible as a single PostgREST query-builder chain. `public.property_ids_with_all_amenities(p_amenity_ids uuid[])` (added Sprint 3) returns the set of `property_id`s having every amenity in the given array (`group by property_id having count(distinct amenity_id) = array_length(...)`), called via `.rpc()` only when an amenities filter is present, then applied as `.in('id', ...)` to the main property query.
 
 ---
 

@@ -1003,7 +1003,9 @@ Used by: `GET /properties` (§6.1).
 }
 ```
 
-The cursor is an opaque, base64-encoded `{ createdAt, id }` pair — clients pass it back verbatim, never construct or inspect it. This avoids the `OFFSET`-degradation problem on the app's highest-traffic query (`database.md` §14) and stays correct even as new properties are inserted while a user scrolls.
+The cursor is an opaque, base64-encoded pair — clients pass it back verbatim, never construct or inspect it. This avoids the `OFFSET`-degradation problem on the app's highest-traffic query (`database.md` §14) and stays correct even as new properties are inserted while a user scrolls.
+
+**Sprint 3 addendum (2026-07-27):** the pair's *internal* shape generalizes to `{ sortValue, id, sort }` rather than being hardcoded to `{ createdAt, id }` — true keyset pagination requires the cursor tuple to match whichever column the active `ORDER BY` actually sorts on, which breaks the moment a guest picks `sort=price_asc`/`price_desc` (§17, `DISC-004`) instead of the default `newest`. `sortValue` holds `created_at` for `newest` or `rent_amount` for either price sort; `sort` records which one so decoding doesn't have to guess. The external contract is unchanged — still opaque, still passed back verbatim — this only clarifies what's inside it. See `frontend/src/entities/property/cursor.ts`.
 
 ## 16.2 Offset Pagination — Bounded Lists
 

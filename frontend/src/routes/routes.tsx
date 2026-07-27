@@ -1,9 +1,11 @@
 import type { RouteObject } from 'react-router';
 import {
   ForgotPasswordPage,
+  HomePage,
   LoginPage,
   PlaceholderPage,
   ProfilePage,
+  PropertiesPage,
   RegisterPage,
   ResetPasswordPage,
 } from '@/pages';
@@ -17,8 +19,8 @@ export const routeConfig: RouteObject[] = [
   {
     element: <AppLayout homeHref={PATHS.public.home} primaryLinks={PRIMARY_NAV_LINKS} />,
     children: [
-      { path: PATHS.public.home, element: <PlaceholderPage title="Home" /> },
-      { path: PATHS.public.properties, element: <PlaceholderPage title="Properties" /> },
+      { path: PATHS.public.home, element: <HomePage /> },
+      { path: PATHS.public.properties, element: <PropertiesPage /> },
       { path: PATHS.public.propertyDetail, element: <PlaceholderPage title="Property Details" /> },
       { path: PATHS.public.login, element: <LoginPage /> },
       { path: PATHS.public.register, element: <RegisterPage /> },

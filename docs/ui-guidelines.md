@@ -790,6 +790,8 @@ A consolidated reference, expressed as the shape of a Tailwind v4 `@theme` block
 
 **Note (added 2026-07-21, FEAT-002):** this snippet originally omitted `--color-card-foreground` despite §4.1 already naming and valuing that token, and didn't define `--color-card`/`--color-destructive` at all. Both gaps are fixed below — `--color-card-foreground` now matches §4.1's already-decided value exactly, and `--color-card`/`--color-destructive`(`-foreground`) are added as value-identical aliases of `--color-surface`/`--color-error`(`-foreground`) so shadcn/ui's generated components (which use `bg-card`/`text-card-foreground`/`bg-destructive` class names by convention) work without hand-editing vendor component source. See `docs/decisions.md` ADR-024.
 
+**Note (added 2026-07-27, Sprint 3):** `--color-success`/`--color-warning` had no `-foreground` pair, unused until Sprint 3's Availability/Verification badges (§12.8/§12.9) became the first real consumer. A programmatic WCAG contrast check found white text fails AA against both colors in both themes (~3.2-3.8:1); `--color-foreground`'s light-mode value (`#0F172A`) passes comfortably (4.7-8.3:1) in both themes, so `-foreground` is a **fixed** dark value in both the light and dark blocks below — not a theme-flipping pair like `error`/`destructive`, since these badge colors stay light/vivid in both themes rather than inverting.
+
 ```css
 @theme {
   /* Color */
@@ -811,7 +813,9 @@ A consolidated reference, expressed as the shape of a Tailwind v4 `@theme` block
   --color-input: #CBD5E1;
   --color-ring: #1E3A5F;
   --color-success: #059669;
+  --color-success-foreground: #0F172A;      /* fixed dark value in both themes, see note above */
   --color-warning: #D97706;
+  --color-warning-foreground: #0F172A;      /* fixed dark value in both themes, see note above */
   --color-error: #DC2626;
   --color-error-foreground: #FFFFFF;
   --color-destructive: #DC2626;             /* alias of --color-error, for shadcn/ui's destructive variant */
