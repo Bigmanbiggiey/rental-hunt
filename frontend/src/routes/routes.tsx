@@ -21,6 +21,9 @@ const HomePage = lazy(() => import('@/pages/HomePage').then((m) => ({ default: m
 const PropertiesPage = lazy(() =>
   import('@/pages/PropertiesPage').then((m) => ({ default: m.PropertiesPage })),
 );
+const PropertyDetailPage = lazy(() =>
+  import('@/pages/PropertyDetailPage').then((m) => ({ default: m.PropertyDetailPage })),
+);
 const LoginPage = lazy(() => import('@/pages/LoginPage').then((m) => ({ default: m.LoginPage })));
 const RegisterPage = lazy(() =>
   import('@/pages/RegisterPage').then((m) => ({ default: m.RegisterPage })),
@@ -43,7 +46,7 @@ export const routeConfig: RouteObject[] = [
     children: [
       { path: PATHS.public.home, element: <HomePage /> },
       { path: PATHS.public.properties, element: <PropertiesPage /> },
-      { path: PATHS.public.propertyDetail, element: <PlaceholderPage title="Property Details" /> },
+      { path: PATHS.public.propertyDetail, element: <PropertyDetailPage /> },
       { path: PATHS.public.login, element: <LoginPage /> },
       { path: PATHS.public.register, element: <RegisterPage /> },
       { path: PATHS.public.forgotPassword, element: <ForgotPasswordPage /> },

@@ -1,43 +1,16 @@
 import { Link } from 'react-router';
-import { toast } from 'sonner';
-import { Bath, BedDouble, Heart, MapPin } from 'lucide-react';
+import { Bath, BedDouble, MapPin } from 'lucide-react';
 import { Badge } from '@/shared/ui';
 import { PATHS } from '@/shared/config';
 import { cn } from '@/shared/lib/utils';
 import { AvailabilityBadge } from './AvailabilityBadge';
 import { VerificationBadge } from './VerificationBadge';
 import { PriceDisplay } from './PriceDisplay';
+import { FavoriteButton } from './FavoriteButton';
 import type { Property } from './property.types';
 
 function propertyDetailPath(slug: string): string {
   return PATHS.public.propertyDetail.replace(':slug', slug);
-}
-
-// ui-guidelines.md §12.12: saving isn't implemented until Sprint 5
-// (FAV-001/FAV-002). Rendered permanently in its "unsaved" state rather than
-// omitted — the anatomy is already decided (§12.1) and omitting it now would
-// reshuffle every card's layout once Sprint 5 wires up the real toggle.
-// TODO(FAV-001/002, Sprint 5): replace with a real optimistic save/unsave.
-function FavoriteButton() {
-  return (
-    <button
-      type="button"
-      aria-pressed={false}
-      aria-label="Save property (coming soon)"
-      className={cn(
-        'absolute top-2 right-2 flex size-8 items-center justify-center rounded-full',
-        'bg-background/80 text-foreground shadow-sm hover:bg-background',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-      )}
-      onClick={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        toast.info('Saving properties is coming soon.');
-      }}
-    >
-      <Heart className="size-4" aria-hidden="true" />
-    </button>
-  );
 }
 
 export function PropertyCard({ property }: { property: Property }) {
@@ -64,7 +37,7 @@ export function PropertyCard({ property }: { property: Property }) {
         <div className="absolute top-2 left-2">
           <VerificationBadge status={property.verificationStatus} />
         </div>
-        <FavoriteButton />
+        <FavoriteButton className="absolute top-2 right-2" />
       </div>
 
       <div className="flex flex-col gap-2 p-4">

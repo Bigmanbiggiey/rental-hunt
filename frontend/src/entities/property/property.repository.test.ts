@@ -15,9 +15,12 @@ import { describe, expect, it, vi } from 'vitest';
  * own `getById` not-found case.
  */
 const mockReturns = vi.fn();
+const mockSingle = vi.fn();
 const mockLimit = vi.fn(() => ({ returns: mockReturns }));
 const mockOrder = vi.fn(() => ({ limit: mockLimit }));
-const mockEq = vi.fn(() => ({ order: mockOrder }));
+// getBySlug's chain ends on .eq().single(); list/listFeatured's on
+// .eq().order()... — both hops need to be available on the same mock.
+const mockEq = vi.fn(() => ({ order: mockOrder, single: mockSingle }));
 const mockSelect = vi.fn(() => ({ eq: mockEq }));
 const mockFrom = vi.fn(() => ({ select: mockSelect }));
 
@@ -44,5 +47,18 @@ describe('propertyRepository.listFeatured (unit, fake Supabase client)', () => {
     expect(result).toEqual([]);
     expect(mockFrom).toHaveBeenCalledWith('properties');
     expect(mockEq).toHaveBeenCalledWith('is_featured', true);
+  });
+});
+
+describe('propertyRepository.getBySlug (unit, fake Supabase client)', () => {
+  it('normalizes a "no rows" error to PROPERTY_NOT_FOUND', async () => {
+    mockSingle.mockResolvedValueOnce({
+      data: null,
+      error: { code: 'PGRST116', message: 'no rows', details: '', hint: '' },
+    });
+
+    await expect(propertyRepository.getBySlug('missing-slug')).rejects.toMatchObject({
+      code: 'PROPERTY_NOT_FOUND',
+    });
   });
 });

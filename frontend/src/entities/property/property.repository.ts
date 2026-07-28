@@ -7,6 +7,13 @@ import type { Cursor, Property, PropertyFilters, PropertyListResult } from './pr
 export interface PropertyRepository {
   list(filters: PropertyFilters, cursor?: Cursor, limit?: number): Promise<PropertyListResult>;
   listFeatured(limit?: number): Promise<Property[]>;
+  getBySlug(slug: string): Promise<Property>;
+  listRelated(input: {
+    propertyId: string;
+    countyId: string;
+    propertyTypeId: string;
+    limit?: number;
+  }): Promise<Property[]>;
 }
 
 // api-design.md §6.1's underlying-call shape — one query, no N+1 client-side
@@ -138,6 +145,38 @@ export const propertyRepository: PropertyRepository = {
       .from('properties')
       .select(PROPERTY_COLUMNS)
       .eq('is_featured', true)
+      .order('created_at', { ascending: false })
+      .limit(limit)
+      .returns<PropertyRow[]>();
+
+    if (error) throw mapSupabaseError(error);
+    return (data ?? []).map(mapPropertyRow);
+  },
+
+  // api-design.md §6.2. Deliberately no getBySlug-adjacent view-count
+  // increment here — no PROP-* acceptance criterion needs it, it only feeds
+  // a future AGENT-008 dashboard story; see api-design.md §6.2's own note.
+  async getBySlug(slug) {
+    const { data, error } = await supabase
+      .from('properties')
+      .select(PROPERTY_COLUMNS)
+      .eq('slug', slug)
+      .single<PropertyRow>();
+
+    if (error) throw mapSupabaseError(error, { notFoundCode: 'PROPERTY_NOT_FOUND' });
+    return mapPropertyRow(data);
+  },
+
+  // PROP-001's "related/similar properties" — same county OR same type (not
+  // AND), so an uncommon type/location pairing still surfaces something;
+  // deliberately not `.list()` with a bolted-on exclusion — that method's
+  // cursor/AND-filter shape is the wrong tool for a small fixed set.
+  async listRelated({ propertyId, countyId, propertyTypeId, limit = 4 }) {
+    const { data, error } = await supabase
+      .from('properties')
+      .select(PROPERTY_COLUMNS)
+      .or(`county_id.eq.${countyId},property_type_id.eq.${propertyTypeId}`)
+      .neq('id', propertyId)
       .order('created_at', { ascending: false })
       .limit(limit)
       .returns<PropertyRow[]>();

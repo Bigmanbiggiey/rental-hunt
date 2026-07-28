@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createClient } from '@supabase/supabase-js';
+import { propertyRepository } from './property.repository';
 
 /**
  * Real RLS integration tests against the local Supabase stack (mirrors
@@ -111,5 +112,40 @@ describe('properties/property_images/property_amenities/agent_directory RLS (int
       .eq('slug', REJECTED_SLUG)
       .single();
     expect(returnedIds).not.toContain(rejectedProp!.id);
+  });
+});
+
+describe('propertyRepository.getBySlug/listRelated RLS (integration, local Supabase, Sprint 4)', () => {
+  it('getBySlug returns a fully embedded Property for a guest-visible slug', async () => {
+    const property = await propertyRepository.getBySlug(VISIBLE_SLUG);
+    expect(property.slug).toBe(VISIBLE_SLUG);
+    expect(property.images.length).toBeGreaterThan(0);
+    expect(property.amenities.length).toBeGreaterThan(0);
+    expect(property.agent.fullName).not.toBe('');
+  });
+
+  it('getBySlug throws PROPERTY_NOT_FOUND for a rejected property, proving RLS not just repository logic', async () => {
+    await expect(propertyRepository.getBySlug(REJECTED_SLUG)).rejects.toMatchObject({
+      code: 'PROPERTY_NOT_FOUND',
+    });
+  });
+
+  it('getBySlug throws PROPERTY_NOT_FOUND for an archived property', async () => {
+    await expect(propertyRepository.getBySlug(ARCHIVED_SLUG)).rejects.toMatchObject({
+      code: 'PROPERTY_NOT_FOUND',
+    });
+  });
+
+  it('listRelated never returns the rejected or archived fixture properties', async () => {
+    const visible = await propertyRepository.getBySlug(VISIBLE_SLUG);
+    const related = await propertyRepository.listRelated({
+      propertyId: visible.id,
+      countyId: visible.countyId,
+      propertyTypeId: visible.propertyTypeId,
+      limit: 50,
+    });
+    expect(related.some((p) => p.slug === REJECTED_SLUG)).toBe(false);
+    expect(related.some((p) => p.slug === ARCHIVED_SLUG)).toBe(false);
+    expect(related.some((p) => p.id === visible.id)).toBe(false);
   });
 });

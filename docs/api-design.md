@@ -453,11 +453,12 @@ Route prefix: none (logical root). All routes below are the Repository's contrac
 |---|---|
 | **Method / Route** | `GET /properties/:slug` |
 | **Repository Function** | `propertyRepository.getBySlug(slug: string)` |
-| **Underlying call** | `supabase.from('properties').select('*, images:property_images(*), amenities:property_amenities(amenity:amenities(*)), agent:agents(*, profile:profiles(full_name, avatar_url))').eq('slug', slug).single()`, plus a fire-and-forget `increment_view_count` RPC (§9's `view_count` counter). |
+| **Underlying call** | The same `PROPERTY_COLUMNS` select §6.1 uses (`.eq('slug', slug).single()` in place of the cursor/limit chain) — `agent:agent_directory(agent_id, agency_id, full_name, avatar_url, job_title, bio)`, not a raw `agents`/`profiles` join (corrected 2026-07-27, Sprint 4 — the `agents`/`profiles` join in this line's earlier draft predated the `agent_directory` view Sprint 3 actually built and never matched the implementation). |
 | **Response Schema** | `Property` (full shape, §3.1) |
 | **Permissions** | Public, subject to the same visibility rule as §6.1. |
 | **Errors** | `PROPERTY_NOT_FOUND` |
 | **Pagination** | N/A (single resource). |
+| **View count** | `properties.view_count` (§5.8) is **not** incremented by this endpoint. An earlier draft of this line described a fire-and-forget `increment_view_count` RPC, but no `PROP-*` acceptance criterion requires view counting — it only feeds a future Agent Dashboard story (`AGENT-008`). Deliberately not built until that story needs it, rather than speculatively. |
 
 ## 6.3 Search Properties
 

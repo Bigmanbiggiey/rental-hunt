@@ -11,3 +11,4 @@ export * from './skeleton';
 export * from './select';
 export * from './checkbox';
 export * from './empty-state';
+export * from './avatar';
