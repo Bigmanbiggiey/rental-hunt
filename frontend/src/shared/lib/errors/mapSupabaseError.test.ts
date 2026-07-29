@@ -51,6 +51,16 @@ describe('mapSupabaseError', () => {
     expect(result.code).toBe('PROFILE_NOT_FOUND');
   });
 
+  it('maps the prevent_booking_unavailable_property trigger errcode (RH001) to PROPERTY_NOT_AVAILABLE', () => {
+    const result = mapSupabaseError({
+      code: 'RH001',
+      message: 'This property is not currently available for booking.',
+      details: '',
+      hint: '',
+    });
+    expect(result.code).toBe('PROPERTY_NOT_AVAILABLE');
+  });
+
   it('maps an unrecognized Postgres code to DATABASE_ERROR', () => {
     const result = mapSupabaseError({
       code: '99999',

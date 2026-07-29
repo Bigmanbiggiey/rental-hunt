@@ -58,6 +58,7 @@ const POSTGREST_ERROR_CODE_MAP: Partial<Record<string, ErrorCode>> = {
   '23514': 'VALIDATION_ERROR', // check_violation
   '42501': 'FORBIDDEN', // insufficient_privilege (RLS rejection)
   PGRST116: 'FORBIDDEN', // 0 or >1 rows for .single() — most often an RLS-filtered miss
+  RH001: 'PROPERTY_NOT_AVAILABLE', // prevent_booking_unavailable_property() trigger (database.md §9) — a dedicated errcode so this specific rejection doesn't fall through to the generic DATABASE_ERROR default.
 };
 
 export interface MapSupabaseErrorOptions {

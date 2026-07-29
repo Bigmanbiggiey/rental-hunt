@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router';
 import { createClient } from '@supabase/supabase-js';
+import { AuthProvider } from '@/entities/user';
 import { PropertiesPage } from './PropertiesPage';
 
 /**
@@ -19,7 +20,9 @@ import { PropertiesPage } from './PropertiesPage';
 const SUPABASE_URL = 'http://127.0.0.1:54321';
 const SERVICE_ROLE_KEY =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU';
-const serviceClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+const serviceClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+  auth: { persistSession: false },
+});
 
 const EXTRA_SLUG_PREFIX = 'pagination-test-fixture-';
 let insertedIds: string[] = [];
@@ -28,9 +31,11 @@ function renderPropertiesPage(initialUrl = '/properties') {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[initialUrl]}>
-        <PropertiesPage />
-      </MemoryRouter>
+      <AuthProvider>
+        <MemoryRouter initialEntries={[initialUrl]}>
+          <PropertiesPage />
+        </MemoryRouter>
+      </AuthProvider>
     </QueryClientProvider>,
   );
 }
@@ -38,9 +43,18 @@ function renderPropertiesPage(initialUrl = '/properties') {
 beforeAll(async () => {
   const { data: agency } = await serviceClient.from('agencies').select('id').limit(1).single();
   const { data: agent } = await serviceClient.from('agents').select('id').limit(1).single();
-  const { data: propertyType } = await serviceClient.from('property_types').select('id').limit(1).single();
+  const { data: propertyType } = await serviceClient
+    .from('property_types')
+    .select('id')
+    .limit(1)
+    .single();
   const { data: county } = await serviceClient.from('counties').select('id').limit(1).single();
-  const { data: location } = await serviceClient.from('locations').select('id').eq('county_id', county!.id).limit(1).single();
+  const { data: location } = await serviceClient
+    .from('locations')
+    .select('id')
+    .eq('county_id', county!.id)
+    .limit(1)
+    .single();
 
   const rows = Array.from({ length: 15 }, (_, i) => ({
     agency_id: agency!.id,
@@ -77,7 +91,9 @@ describe('PropertiesPage (integration, local Supabase) — cursor pagination', (
 
     await waitFor(
       () => {
-        const links = screen.getAllByRole('link').filter((el) => el.getAttribute('href')?.includes('/properties/'));
+        const links = screen
+          .getAllByRole('link')
+          .filter((el) => el.getAttribute('href')?.includes('/properties/'));
         expect(links.length).toBe(20);
       },
       { timeout: 10000 },
@@ -90,7 +106,9 @@ describe('PropertiesPage (integration, local Supabase) — cursor pagination', (
 
     await waitFor(
       () => {
-        const links = screen.getAllByRole('link').filter((el) => el.getAttribute('href')?.includes('/properties/'));
+        const links = screen
+          .getAllByRole('link')
+          .filter((el) => el.getAttribute('href')?.includes('/properties/'));
         // 7 seeded + 15 synthetic = 22 total, no duplicates.
         expect(links.length).toBe(22);
         const hrefs = links.map((el) => el.getAttribute('href'));

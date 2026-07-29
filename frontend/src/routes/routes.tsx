@@ -37,6 +37,15 @@ const ResetPasswordPage = lazy(() =>
 const ProfilePage = lazy(() =>
   import('@/pages/ProfilePage').then((m) => ({ default: m.ProfilePage })),
 );
+const DashboardPage = lazy(() =>
+  import('@/pages/DashboardPage').then((m) => ({ default: m.DashboardPage })),
+);
+const FavoritesPage = lazy(() =>
+  import('@/pages/FavoritesPage').then((m) => ({ default: m.FavoritesPage })),
+);
+const BookingsPage = lazy(() =>
+  import('@/pages/BookingsPage').then((m) => ({ default: m.BookingsPage })),
+);
 
 const PRIMARY_NAV_LINKS: NavLink[] = [{ label: 'Browse Properties', to: PATHS.public.properties }];
 
@@ -55,9 +64,9 @@ export const routeConfig: RouteObject[] = [
         // Any authenticated role (architecture.md §6's "Authenticated Routes").
         element: <ProtectedRoute />,
         children: [
-          { path: PATHS.authenticated.dashboard, element: <PlaceholderPage title="Dashboard" /> },
-          { path: PATHS.authenticated.favorites, element: <PlaceholderPage title="Favorites" /> },
-          { path: PATHS.authenticated.bookings, element: <PlaceholderPage title="Bookings" /> },
+          { path: PATHS.authenticated.dashboard, element: <DashboardPage /> },
+          { path: PATHS.authenticated.favorites, element: <FavoritesPage /> },
+          { path: PATHS.authenticated.bookings, element: <BookingsPage /> },
           { path: PATHS.authenticated.profile, element: <ProfilePage /> },
         ],
       },

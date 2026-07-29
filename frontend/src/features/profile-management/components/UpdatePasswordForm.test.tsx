@@ -23,48 +23,44 @@ function renderUpdatePasswordForm() {
 }
 
 describe('UpdatePasswordForm (integration, local Supabase)', () => {
-  it(
-    'changes the password after confirming the current one, and the new password works for login',
-    async () => {
-      const email = `rtl-update-pw-${Date.now()}@example.com`;
-      await supabase.auth.signUp({
-        email,
-        password: 'Kilimani2026',
-        options: { data: { full_name: 'Update Password Test' } },
-      });
+  it('changes the password after confirming the current one, and the new password works for login', async () => {
+    const email = `rtl-update-pw-${Date.now()}@example.com`;
+    await supabase.auth.signUp({
+      email,
+      password: 'Kilimani2026',
+      options: { data: { full_name: 'Update Password Test' } },
+    });
 
-      const user = userEvent.setup();
-      renderUpdatePasswordForm();
+    const user = userEvent.setup();
+    renderUpdatePasswordForm();
 
-      await user.type(screen.getByLabelText(/current password/i), 'Kilimani2026');
-      await user.type(screen.getByLabelText(/^new password/i), 'NewKilimani2027');
-      await user.type(screen.getByLabelText(/confirm new password/i), 'NewKilimani2027');
-      await user.click(screen.getByRole('button', { name: /update password/i }));
+    await user.type(screen.getByLabelText(/current password/i), 'Kilimani2026');
+    await user.type(screen.getByLabelText(/^new password/i), 'NewKilimani2027');
+    await user.type(screen.getByLabelText(/confirm new password/i), 'NewKilimani2027');
+    await user.click(screen.getByRole('button', { name: /update password/i }));
 
-      // The form only calls reset() in onSuccess, so an emptied current-password
-      // field is a reliable signal the mutation actually succeeded.
-      await waitFor(() => expect(screen.getByLabelText(/current password/i)).toHaveValue(''), {
-        timeout: 10000,
-      });
+    // The form only calls reset() in onSuccess, so an emptied current-password
+    // field is a reliable signal the mutation actually succeeded.
+    await waitFor(() => expect(screen.getByLabelText(/current password/i)).toHaveValue(''), {
+      timeout: 10000,
+    });
 
-      await supabase.auth.signOut();
+    await supabase.auth.signOut();
 
-      const { error: oldPasswordError } = await supabase.auth.signInWithPassword({
-        email,
-        password: 'Kilimani2026',
-      });
-      expect(oldPasswordError).not.toBeNull();
+    const { error: oldPasswordError } = await supabase.auth.signInWithPassword({
+      email,
+      password: 'Kilimani2026',
+    });
+    expect(oldPasswordError).not.toBeNull();
 
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password: 'NewKilimani2027',
-      });
-      expect(error).toBeNull();
-      expect(data.user?.email).toBe(email);
-      await supabase.auth.signOut();
-    },
-    15000,
-  );
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password: 'NewKilimani2027',
+    });
+    expect(error).toBeNull();
+    expect(data.user?.email).toBe(email);
+    await supabase.auth.signOut();
+  }, 15000);
 
   it('shows an error and does not change the password when the current password is wrong', async () => {
     const email = `rtl-update-pw-wrong-${Date.now()}@example.com`;

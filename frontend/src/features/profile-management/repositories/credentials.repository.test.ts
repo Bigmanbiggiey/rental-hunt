@@ -25,7 +25,10 @@ beforeEach(() => {
 describe('credentialsRepository (unit, fake Supabase client)', () => {
   describe('getCurrentEmail', () => {
     it('returns the current session email', async () => {
-      mockGetUser.mockResolvedValueOnce({ data: { user: { email: 'amina@example.com' } }, error: null });
+      mockGetUser.mockResolvedValueOnce({
+        data: { user: { email: 'amina@example.com' } },
+        error: null,
+      });
 
       await expect(credentialsRepository.getCurrentEmail()).resolves.toBe('amina@example.com');
     });
@@ -65,7 +68,10 @@ describe('credentialsRepository (unit, fake Supabase client)', () => {
 
   describe('updatePassword', () => {
     it('re-authenticates with the current password before applying the new one', async () => {
-      mockGetUser.mockResolvedValueOnce({ data: { user: { email: 'amina@example.com' } }, error: null });
+      mockGetUser.mockResolvedValueOnce({
+        data: { user: { email: 'amina@example.com' } },
+        error: null,
+      });
       mockSignInWithPassword.mockResolvedValueOnce({ data: {}, error: null });
       mockUpdateUser.mockResolvedValueOnce({ data: {}, error: null });
 
@@ -82,7 +88,10 @@ describe('credentialsRepository (unit, fake Supabase client)', () => {
     });
 
     it('rejects with INVALID_CREDENTIALS and never applies the change when the current password is wrong', async () => {
-      mockGetUser.mockResolvedValueOnce({ data: { user: { email: 'amina@example.com' } }, error: null });
+      mockGetUser.mockResolvedValueOnce({
+        data: { user: { email: 'amina@example.com' } },
+        error: null,
+      });
       mockSignInWithPassword.mockResolvedValueOnce({
         data: {},
         error: { code: 'invalid_credentials', message: 'wrong password' },

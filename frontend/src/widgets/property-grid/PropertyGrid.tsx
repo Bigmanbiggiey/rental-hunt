@@ -1,6 +1,7 @@
 import { PropertyCard, PropertyCardSkeleton } from '@/entities/property';
 import { EmptySearchResults, useProperties } from '@/features/property-search';
 import type { PropertyFiltersRawInput } from '@/features/property-search';
+import { useFavoriteIds, useToggleFavorite } from '@/features/favorites';
 import { Alert, AlertDescription, Button } from '@/shared/ui';
 
 interface PropertyGridProps {
@@ -20,6 +21,8 @@ interface PropertyGridProps {
 export function PropertyGrid({ rawFilters, onClearFilters }: PropertyGridProps) {
   const { data, isLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useProperties(rawFilters);
+  const { data: favoriteIds } = useFavoriteIds();
+  const toggleFavorite = useToggleFavorite();
 
   if (isLoading) {
     return (
@@ -34,7 +37,9 @@ export function PropertyGrid({ rawFilters, onClearFilters }: PropertyGridProps) 
   if (isError) {
     return (
       <Alert variant="destructive">
-        <AlertDescription>Something went wrong on our end. Please try again in a moment.</AlertDescription>
+        <AlertDescription>
+          Something went wrong on our end. Please try again in a moment.
+        </AlertDescription>
       </Alert>
     );
   }
@@ -48,9 +53,21 @@ export function PropertyGrid({ rawFilters, onClearFilters }: PropertyGridProps) 
   return (
     <div className="flex flex-col gap-6">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {properties.map((property) => (
-          <PropertyCard key={property.id} property={property} />
-        ))}
+        {properties.map((property) => {
+          const isSaved = favoriteIds?.has(property.id) ?? false;
+          return (
+            <PropertyCard
+              key={property.id}
+              property={property}
+              favorite={{
+                isSaved,
+                isPending:
+                  toggleFavorite.isPending && toggleFavorite.variables?.propertyId === property.id,
+                onToggle: () => toggleFavorite.mutate({ propertyId: property.id, isSaved }),
+              }}
+            />
+          );
+        })}
       </div>
 
       {hasNextPage && (

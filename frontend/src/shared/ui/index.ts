@@ -12,3 +12,6 @@ export * from './select';
 export * from './checkbox';
 export * from './empty-state';
 export * from './avatar';
+export * from './switch';
+export * from './textarea';
+export * from './dialog';

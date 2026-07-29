@@ -9,7 +9,11 @@ import { useUpdateEmail } from '../hooks/useUpdateEmail';
 import { UpdateEmailSchema, type UpdateEmailInput } from '../schemas/updateEmail.schema';
 
 export function UpdateEmailForm() {
-  const { data: currentEmail, isLoading: isLoadingEmail, isError: isEmailError } = useCurrentEmail();
+  const {
+    data: currentEmail,
+    isLoading: isLoadingEmail,
+    isError: isEmailError,
+  } = useCurrentEmail();
   const { mutate, isPending, error } = useUpdateEmail();
 
   const {

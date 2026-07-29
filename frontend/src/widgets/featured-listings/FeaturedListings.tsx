@@ -1,6 +1,7 @@
 import { Link } from 'react-router';
 import { PropertyCard, PropertyCardSkeleton } from '@/entities/property';
 import { useFeaturedProperties } from '@/features/property-search';
+import { useFavoriteIds, useToggleFavorite } from '@/features/favorites';
 import { PATHS } from '@/shared/config';
 
 /**
@@ -13,6 +14,8 @@ import { PATHS } from '@/shared/config';
  */
 export function FeaturedListings() {
   const { data: properties, isLoading, isError } = useFeaturedProperties();
+  const { data: favoriteIds } = useFavoriteIds();
+  const toggleFavorite = useToggleFavorite();
 
   if (isError) return null;
   if (!isLoading && (!properties || properties.length === 0)) return null;
@@ -20,8 +23,11 @@ export function FeaturedListings() {
   return (
     <section className="flex flex-col gap-6 px-4 py-10 sm:px-6 lg:px-8">
       <div className="flex items-center justify-between">
-        <h2 className="text-h2 font-semibold text-foreground">Featured Properties</h2>
-        <Link to={PATHS.public.properties} className="text-body-sm font-medium text-primary hover:underline">
+        <h2 className="text-h2 text-foreground font-semibold">Featured Properties</h2>
+        <Link
+          to={PATHS.public.properties}
+          className="text-body-sm text-primary font-medium hover:underline"
+        >
           View all
         </Link>
       </div>
@@ -29,7 +35,22 @@ export function FeaturedListings() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {isLoading || !properties
           ? Array.from({ length: 4 }).map((_, i) => <PropertyCardSkeleton key={i} />)
-          : properties.map((property) => <PropertyCard key={property.id} property={property} />)}
+          : properties.map((property) => {
+              const isSaved = favoriteIds?.has(property.id) ?? false;
+              return (
+                <PropertyCard
+                  key={property.id}
+                  property={property}
+                  favorite={{
+                    isSaved,
+                    isPending:
+                      toggleFavorite.isPending &&
+                      toggleFavorite.variables?.propertyId === property.id,
+                    onToggle: () => toggleFavorite.mutate({ propertyId: property.id, isSaved }),
+                  }}
+                />
+              );
+            })}
       </div>
     </section>
   );

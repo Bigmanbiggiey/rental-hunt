@@ -3,6 +3,10 @@
 // internal.
 export { UpdateEmailForm } from './components/UpdateEmailForm';
 export { UpdatePasswordForm } from './components/UpdatePasswordForm';
+export { UpdateProfileForm } from './components/UpdateProfileForm';
+export { NotificationPreferencesForm } from './components/NotificationPreferencesForm';
 export { useCurrentEmail } from './hooks/useCurrentEmail';
 export { useUpdateEmail } from './hooks/useUpdateEmail';
 export { useUpdatePassword } from './hooks/useUpdatePassword';
+export { useUpdateProfile } from './hooks/useUpdateProfile';
+export { useUpdateNotificationPreferences } from './hooks/useUpdateNotificationPreferences';

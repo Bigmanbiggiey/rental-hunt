@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router';
+import { AuthProvider } from '@/entities/user';
 import { PropertyDetailPage } from './PropertyDetailPage';
 
 /** Real integration test against the local Supabase stack — mirrors `PropertiesPage.test.tsx`'s pattern. */
@@ -9,11 +10,13 @@ function renderDetailPage(slug: string) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[`/properties/${slug}`]}>
-        <Routes>
-          <Route path="/properties/:slug" element={<PropertyDetailPage />} />
-        </Routes>
-      </MemoryRouter>
+      <AuthProvider>
+        <MemoryRouter initialEntries={[`/properties/${slug}`]}>
+          <Routes>
+            <Route path="/properties/:slug" element={<PropertyDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      </AuthProvider>
     </QueryClientProvider>,
   );
 }
@@ -23,7 +26,10 @@ describe('PropertyDetailPage (integration, local Supabase)', () => {
     renderDetailPage('2br-apartment-kilimani-a1');
 
     await waitFor(
-      () => expect(screen.getByRole('heading', { name: /modern 2br apartment in kilimani/i })).toBeInTheDocument(),
+      () =>
+        expect(
+          screen.getByRole('heading', { name: /modern 2br apartment in kilimani/i }),
+        ).toBeInTheDocument(),
       { timeout: 10000 },
     );
 
@@ -42,12 +48,17 @@ describe('PropertyDetailPage (integration, local Supabase)', () => {
     expect(screen.getByText('Verified')).toBeInTheDocument();
     expect(screen.getByText(/last verified/i)).toBeInTheDocument();
 
-    // Viewing CTA, disabled.
-    expect(screen.getByRole('button', { name: /book a viewing/i })).toBeDisabled();
+    // Viewing CTA — enabled for this available property (VIEW-001); a guest
+    // click redirects to login rather than opening the booking dialog,
+    // exercised separately in BookingRequestDialog/ViewingCTA's own tests.
+    expect(screen.getByRole('button', { name: /book a viewing/i })).not.toBeDisabled();
 
     // Map "Get Directions" link with the correct coordinates.
     const directionsLink = screen.getByRole('link', { name: /get directions/i });
-    expect(directionsLink).toHaveAttribute('href', expect.stringContaining('destination=-1.29,36.783'));
+    expect(directionsLink).toHaveAttribute(
+      'href',
+      expect.stringContaining('destination=-1.29,36.783'),
+    );
 
     // Related properties (same county/type as the fixture — see property.rls.test.ts).
     await waitFor(() => expect(screen.getByText('Similar Properties')).toBeInTheDocument());

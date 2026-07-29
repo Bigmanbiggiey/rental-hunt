@@ -804,6 +804,27 @@ A decision that's easily reversible, purely cosmetic, or has no real alternative
 
 ---
 
+## ADR-028: `viewingRequestRepository` lives in `entities/viewing-request`; `favoritesRepository` lives in `features/favorites` — the opposite placement, for the opposite reason
+
+**Status:** Accepted
+**Date:** 2026-07-29
+
+**Decision:** Sprint 5 adds two new data-access surfaces with deliberately different placements. `entities/viewing-request/viewing-request.repository.ts` holds the actual `viewing_requests` queries (`create`/`cancel`/`listForCustomer` this sprint); `features/viewing-requests` owns only the Zod schemas, Services, hooks, and booking/cancel-dialog UI on top of it. `features/favorites/repositories/favorites.repository.ts`, by contrast, holds the `favorites` queries directly inside the feature — no `entities/favorite` slice was created.
+
+**Context:** ADR-026 already established the test for this exact question when `propertyRepository` was placed in `entities/property`: is the repository's data genuinely needed by more than one feature/sprint, or does exactly one feature own it? `viewing_requests` fails the "one owner" test — Sprint 6's agent-side `BOOK-001`–`006` (`listForAgent`, `confirm`, `reschedule`, `complete`, `markNoShow`) reads and mutates the *same* table through what will be the *same* interface, extended in place exactly like `getBySlug` was added to `PropertyRepository` in Sprint 4. Putting it in `features/viewing-requests` now would force Sprint 6 to either duplicate the repository or reach across the sibling-feature-import boundary ADR-025 exists to block. `favorites`, on the other hand, passes the "one owner" test cleanly: the RLS Policy Summary's "Moderator: SELECT all (support/analytics)" row has no scheduled consumer in any future sprint on the roadmap, and nothing else reads or writes `favorites`.
+
+**Rationale:** Same underlying principle as ADR-026 (repository placement follows the *data's* cross-cutting shape, not which feature happened to need it first), applied consistently to two entities that land on opposite sides of it. This is why ADR-026's own "When To Revisit" note frames the test as a question to re-ask each time, not a rule scoped only to `properties`.
+
+**Consequences:** Sprint 6 extends `ViewingRequestRepository`'s interface in `entities/viewing-request/` without touching `features/viewing-requests`. If a future sprint ever needs favorites data outside `features/favorites` (e.g. an admin analytics dashboard), that would be the trigger to move `favoritesRepository` into `entities/` at that point — not before.
+
+**Trade-offs:** None of real weight — this is the same "colocate where the data's actual shape points" reasoning as ADR-026, just landing on two different, individually-correct answers for two different entities introduced in the same sprint.
+
+**When To Revisit:** If `favorites` ever gains a second real consumer outside this feature, per the Consequences note above.
+
+**Related Documents:** ADR-026 (`propertyRepository` placement, the precedent this directly extends), `database.md` §9 (Policy Summary's `favorites`/`viewing_requests` rows), `frontend/src/entities/viewing-request/viewing-request.repository.ts`, `frontend/src/features/favorites/repositories/favorites.repository.ts`.
+
+---
+
 # Future ADR Process
 
 | Aspect | Rule |

@@ -569,6 +569,18 @@ Also not a separate endpoint — see §17 for the full filter parameter referenc
 | **Pagination** | Offset (§16.2) — a customer's favorites list is small and bounded, so simple page numbers are appropriate. |
 | **Errors** | `UNAUTHENTICATED` |
 
+## 7.4 List Favorite Property IDs
+
+| | |
+|---|---|
+| **Method / Route** | Not a separate REST endpoint — a lighter-weight query shape of §7.3, not documented there originally. |
+| **Repository Function** | `favoritesRepository.listIds()` (added Sprint 5) |
+| **Underlying call** | `supabase.from('favorites').select('property_id')` — no embed. |
+| **Response** | `string[]` (property IDs only) |
+| **Why it exists** | §7.3's `list()` expands the full `Favorite` shape (property + images) — too heavy to call from every `PropertyCard` render just to answer "is this one saved?" (`useFavoriteIds()`, shared across every card-rendering widget/page via one cached TanStack Query key). |
+| **Permissions** | Customer only, own rows. |
+| **Errors** | `UNAUTHENTICATED` |
+
 ---
 
 # 8. Viewing Request API
@@ -625,9 +637,10 @@ stateDiagram-v2
 | | |
 |---|---|
 | **Method / Route** | `GET /viewing-requests?scope=mine` |
-| **Repository Function** | `viewingRequestRepository.listForCustomer(status?: ViewingStatus[], page = 1, pageSize = 20)` (`VIEW-005`, `CUST-001`, `CUST-002`) |
-| **Permissions** | Customer, own rows only. |
+| **Repository Function** | `viewingRequestRepository.listForCustomer(input?: { status?: ViewingStatus[]; page?: number; pageSize?: number; sort?: 'requestedDateAsc' \| 'requestedDateDesc' \| 'createdAtDesc' })` (`VIEW-005`, `CUST-001`, `CUST-002`) |
+| **Permissions** | Customer, own rows only (enforced by RLS — no explicit `customer_id` filter needed in the query itself). |
 | **Pagination** | Offset (§16.2). |
+| **Sort (added Sprint 5)** | A single method serves three different orderings rather than three near-duplicate methods: `CUST-001` (Upcoming) uses `requestedDateAsc`, `CUST-002` (Completed) uses `requestedDateDesc`, `VIEW-005` (full history) uses `createdAtDesc` ("most recent request first" means most recently *submitted*, not most recently *scheduled*). Changed from the originally documented positional `(status?, page, pageSize)` signature to this options object once a third ordering need (beyond just status-filtering) became clear. |
 | **Errors** | `UNAUTHENTICATED` |
 
 ## 8.4 List Property Viewings (Agent Queue)
@@ -982,6 +995,10 @@ Every Repository method either resolves with a `{ success: true, data, meta? }` 
 | Network/timeout | Supabase unreachable | `UNEXPECTED_ERROR` (with retry, `architecture.md` §16) |
 
 This mapping table lives in exactly one shared utility (`mapSupabaseError()`), used by every Repository — never reimplemented per-repository.
+
+**Mechanism for the `prevent_booking_unavailable_property()` row above (added Sprint 5):** the trigger raises with a dedicated Postgres errcode, `RH001` (`database.md` §9), rather than the default `P0001` — `mapSupabaseError()`'s `POSTGREST_ERROR_CODE_MAP` maps `RH001` directly to `PROPERTY_NOT_AVAILABLE`. This is the general pattern for any trigger whose rejection needs to reach the frontend as a specific typed code: a dedicated errcode, never matching on the raised message text (brittle, locale-fragile).
+
+**`viewingRequestRepository.cancel(id, reason?)`'s not-found case (added Sprint 5):** RLS's `viewing_requests_cancel_own_customer` policy scopes the `UPDATE` to the caller's own rows while `status IN ('pending','confirmed')` — a 0-rows-affected result (PostgREST `PGRST116`) can mean either "not your request" or "already in a terminal state," and RLS deliberately can't distinguish the two (same non-leaking reasoning as `profile.rls.test.ts`'s own-row policies). This normalizes to `INVALID_STATE_TRANSITION`, not `VIEWING_REQUEST_NOT_FOUND` — the Cancel button is only ever shown on a request the customer can already see, so a real hit here is stale client state, not an ownership violation.
 
 ---
 

@@ -20,7 +20,10 @@ export interface PropertyRepository {
 // fetches (database.md §14). `agent:agent_directory(...)` embeds cleanly even
 // though the view has no declared FK (verified directly against PostgREST,
 // not assumed): it resolves the relationship via `properties.agent_id`.
-const PROPERTY_COLUMNS = `
+// Exported so `features/favorites` can reuse the exact same full-`Property`
+// select shape for `Favorite.property` instead of duplicating a 20+-column
+// list that would drift out of sync.
+export const PROPERTY_COLUMNS = `
   id, slug, title, description, agency_id, agent_id, property_type_id, county_id, location_id,
   latitude, longitude, bedrooms, bathrooms, rent_amount, deposit_amount, currency,
   availability_status, verification_status, last_verified_at, is_featured, is_archived,

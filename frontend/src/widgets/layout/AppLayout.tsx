@@ -15,8 +15,12 @@ interface AppLayoutProps {
 // downloading route chunk is (unlike a Skeleton, which mirrors known content).
 function RouteLoadingFallback() {
   return (
-    <div className="flex h-full items-center justify-center p-12" role="status" aria-label="Loading page">
-      <Loader2 className="size-8 animate-spin text-muted-foreground" aria-hidden="true" />
+    <div
+      className="flex h-full items-center justify-center p-12"
+      role="status"
+      aria-label="Loading page"
+    >
+      <Loader2 className="text-muted-foreground size-8 animate-spin" aria-hidden="true" />
     </div>
   );
 }

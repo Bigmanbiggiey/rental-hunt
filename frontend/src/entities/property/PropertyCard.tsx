@@ -13,19 +13,31 @@ function propertyDetailPath(slug: string): string {
   return PATHS.public.propertyDetail.replace(':slug', slug);
 }
 
-export function PropertyCard({ property }: { property: Property }) {
+export interface PropertyCardFavoriteProps {
+  isSaved: boolean;
+  isPending: boolean;
+  onToggle: () => void;
+}
+
+export function PropertyCard({
+  property,
+  favorite,
+}: {
+  property: Property;
+  favorite: PropertyCardFavoriteProps;
+}) {
   const primaryImage = property.images[0];
 
   return (
     <Link
       to={propertyDetailPath(property.slug)}
       className={cn(
-        'group block overflow-hidden rounded-lg border border-border bg-card shadow-sm transition-shadow',
-        'hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        'group border-border bg-card block overflow-hidden rounded-lg border shadow-sm transition-shadow',
+        'focus-visible:ring-ring hover:shadow-md focus-visible:ring-2 focus-visible:outline-none',
         property.availabilityStatus !== 'available' && 'opacity-90',
       )}
     >
-      <div className="relative aspect-4/3 overflow-hidden bg-muted">
+      <div className="bg-muted relative aspect-4/3 overflow-hidden">
         {primaryImage ? (
           <img
             src={primaryImage.imageUrl}
@@ -34,23 +46,30 @@ export function PropertyCard({ property }: { property: Property }) {
             className="size-full object-cover"
           />
         ) : null}
-        <div className="absolute top-2 left-2">
+        <div className="absolute top-2 left-2 flex gap-1">
           <VerificationBadge status={property.verificationStatus} />
+          {/* Only reachable from Favorites/Bookings data — public feeds already exclude archived rows via RLS (FAV-003). */}
+          {property.isArchived && <Badge variant="secondary">Archived</Badge>}
         </div>
-        <FavoriteButton className="absolute top-2 right-2" />
+        <FavoriteButton
+          isSaved={favorite.isSaved}
+          isPending={favorite.isPending}
+          onToggle={favorite.onToggle}
+          className="absolute top-2 right-2"
+        />
       </div>
 
       <div className="flex flex-col gap-2 p-4">
-        <h4 className="text-h4 truncate font-semibold text-foreground">{property.title}</h4>
+        <h4 className="text-h4 text-foreground truncate font-semibold">{property.title}</h4>
 
-        <p className="flex items-center gap-1 text-body-sm text-muted-foreground">
+        <p className="text-body-sm text-muted-foreground flex items-center gap-1">
           <MapPin className="size-3.5 shrink-0" aria-hidden="true" />
           <span className="truncate">
             {property.locationName}, {property.countyName}
           </span>
         </p>
 
-        <div className="flex items-center gap-3 text-body-sm text-muted-foreground">
+        <div className="text-body-sm text-muted-foreground flex items-center gap-3">
           <span className="flex items-center gap-1">
             <BedDouble className="size-4" aria-hidden="true" />
             {property.bedrooms}

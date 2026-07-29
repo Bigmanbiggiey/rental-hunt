@@ -14,9 +14,9 @@ export function SearchHero() {
   const navigate = useNavigate();
 
   return (
-    <section className="flex flex-col items-center gap-6 bg-accent px-4 py-12 text-center sm:py-16">
+    <section className="bg-accent flex flex-col items-center gap-6 px-4 py-12 text-center sm:py-16">
       <div className="flex flex-col gap-2">
-        <h1 className="text-display font-bold text-foreground">Find your next home in Kenya</h1>
+        <h1 className="text-display text-foreground font-bold">Find your next home in Kenya</h1>
         <p className="text-body text-muted-foreground">
           Verified listings from trusted agencies — search by neighborhood to get started.
         </p>
@@ -35,7 +35,7 @@ export function SearchHero() {
         />
       </div>
 
-      <div className="flex flex-wrap items-center justify-center gap-4 text-body-sm text-muted-foreground">
+      <div className="text-body-sm text-muted-foreground flex flex-wrap items-center justify-center gap-4">
         <span className="flex items-center gap-1">
           <ShieldCheck className="size-4" aria-hidden="true" />
           Verified Listings

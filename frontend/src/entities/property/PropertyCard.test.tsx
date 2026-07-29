@@ -2,11 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
-import { toast } from 'sonner';
-import { PropertyCard } from './PropertyCard';
+import { PropertyCard, type PropertyCardFavoriteProps } from './PropertyCard';
 import type { Property } from './property.types';
-
-vi.mock('sonner', () => ({ toast: { info: vi.fn(), success: vi.fn(), error: vi.fn() } }));
 
 const PROPERTY: Property = {
   id: 'p1',
@@ -34,17 +31,35 @@ const PROPERTY: Property = {
   isFeatured: true,
   isArchived: false,
   viewCount: 3,
-  images: [{ id: 'img1', propertyId: 'p1', imageUrl: 'https://x/1.jpg', altText: 'front', displayOrder: 0 }],
+  images: [
+    {
+      id: 'img1',
+      propertyId: 'p1',
+      imageUrl: 'https://x/1.jpg',
+      altText: 'front',
+      displayOrder: 0,
+    },
+  ],
   amenities: [{ id: 'am1', name: 'WiFi', icon: 'wifi' }],
-  agent: { id: 'agent1', fullName: 'James Mwangi', avatarUrl: null, jobTitle: 'Leasing Agent', bio: null, agencyId: 'ag1' },
+  agent: {
+    id: 'agent1',
+    fullName: 'James Mwangi',
+    avatarUrl: null,
+    jobTitle: 'Leasing Agent',
+    bio: null,
+    agencyId: 'ag1',
+  },
   createdAt: '2026-07-20T00:00:00.000Z',
   updatedAt: '2026-07-20T00:00:00.000Z',
 };
 
-function renderCard(property: Property = PROPERTY) {
+function renderCard(
+  property: Property = PROPERTY,
+  favorite: PropertyCardFavoriteProps = { isSaved: false, isPending: false, onToggle: vi.fn() },
+) {
   return render(
     <MemoryRouter>
-      <PropertyCard property={property} />
+      <PropertyCard property={property} favorite={favorite} />
     </MemoryRouter>,
   );
 }
@@ -67,23 +82,35 @@ describe('PropertyCard (component)', () => {
   });
 
   it('maps every availability/verification status to its documented badge label', () => {
-    renderCard({ ...PROPERTY, availabilityStatus: 'reserved', verificationStatus: 'pending_verification' });
+    renderCard({
+      ...PROPERTY,
+      availabilityStatus: 'reserved',
+      verificationStatus: 'pending_verification',
+    });
     expect(screen.getByText('Reserved')).toBeInTheDocument();
     expect(screen.getByText('Pending Verification')).toBeInTheDocument();
   });
 
-  it('the Favorite Button never navigates and shows a "coming soon" toast (FAV-001/002 not yet built)', async () => {
-    const user = userEvent.setup();
+  it('renders an Archived badge only when the property is archived (FAV-003)', () => {
     renderCard();
+    expect(screen.queryByText('Archived')).not.toBeInTheDocument();
+
+    renderCard({ ...PROPERTY, isArchived: true });
+    expect(screen.getByText('Archived')).toBeInTheDocument();
+  });
+
+  it('forwards the favorite prop bundle to FavoriteButton, which never navigates', async () => {
+    const user = userEvent.setup();
+    const onToggle = vi.fn();
+    renderCard(PROPERTY, { isSaved: false, isPending: false, onToggle });
 
     const favoriteButton = screen.getByRole('button', { name: /save property/i });
     expect(favoriteButton).toHaveAttribute('aria-pressed', 'false');
 
     await user.click(favoriteButton);
 
-    expect(toast.info).toHaveBeenCalledWith('Saving properties is coming soon.');
-    // Still on the card, not navigated away — jsdom's MemoryRouter would have
-    // thrown/warned on an actual navigation attempt to a non-existent route.
+    expect(onToggle).toHaveBeenCalledTimes(1);
+    // Still on the card, not navigated away.
     expect(screen.getByRole('link')).toHaveAttribute('href', '/properties/test-2br-kilimani');
   });
 });

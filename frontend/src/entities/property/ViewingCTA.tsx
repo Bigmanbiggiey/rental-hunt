@@ -1,24 +1,30 @@
 import { Alert, AlertDescription, Button } from '@/shared/ui';
+import type { PropertyAvailabilityStatus } from './property.types';
 
-// ui-guidelines.md §12.4/§12.14. Always disabled this sprint — booking
-// (VIEW-001) doesn't exist yet, independent of availability_status or
-// guest/customer state; that distinction is real once VIEW-001 ships, not
-// before, so a single generic "coming soon" state is more honest than
-// half-implementing the guest-redirect/availability rule from §12.14.
-// Sticky-bottom positioning on mobile is implemented now (pure layout,
-// already decided in docs) so Sprint 5 doesn't have to reshuffle the page —
-// the same reasoning already applied to FavoriteButton in Sprint 3.
-// TODO(VIEW-001, Sprint 5): wire up the real booking flow and the
-// availability/guest-redirect branches from ui-guidelines.md §12.14.
-export function ViewingCTA() {
+// ui-guidelines.md §12.4/§12.14. Controlled component (entities/ can't
+// import features/, see FavoriteButton's same note) — `onBook` is decided by
+// whichever page renders this (guest -> navigate to login; customer -> open
+// the booking dialog), `entities/property` only knows availability. Sticky-
+// bottom positioning on mobile is pure layout, unchanged since Sprint 3/4.
+export function ViewingCTA({
+  availabilityStatus,
+  onBook,
+}: {
+  availabilityStatus: PropertyAvailabilityStatus;
+  onBook: () => void;
+}) {
+  const isAvailable = availabilityStatus === 'available';
+
   return (
-    <div className="sticky bottom-0 z-10 flex flex-col gap-2 border-t border-border bg-background p-4 sm:static sm:border-0 sm:p-0">
-      <Button size="lg" disabled>
+    <div className="border-border bg-background sticky bottom-0 z-10 flex flex-col gap-2 border-t p-4 sm:static sm:border-0 sm:p-0">
+      <Button size="lg" disabled={!isAvailable} onClick={onBook}>
         Book a Viewing
       </Button>
-      <Alert>
-        <AlertDescription>Booking is coming soon.</AlertDescription>
-      </Alert>
+      {!isAvailable && (
+        <Alert>
+          <AlertDescription>This property isn't currently available for booking.</AlertDescription>
+        </Alert>
+      )}
     </div>
   );
 }
