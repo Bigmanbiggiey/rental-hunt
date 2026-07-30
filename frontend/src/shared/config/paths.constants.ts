@@ -19,6 +19,15 @@ export const PATHS = {
     favorites: '/favorites',
     bookings: '/bookings',
     profile: '/profile',
+    // Sprint 6, agent role only — nested under /dashboard specifically to
+    // avoid colliding with the customer's own top-level /bookings (Sprint
+    // 5's full viewing-history page). /dashboard itself stays one URL,
+    // branching its content by role (Gap 3, DashboardPage.tsx).
+    agentProperties: '/dashboard/properties',
+    agentPropertyNew: '/dashboard/properties/new',
+    agentPropertyEdit: '/dashboard/properties/:id/edit',
+    agentBookings: '/dashboard/bookings',
+    agentAnalytics: '/dashboard/analytics',
   },
   admin: {
     root: '/admin',

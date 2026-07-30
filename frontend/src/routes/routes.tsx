@@ -5,7 +5,7 @@ import type { RouteObject } from 'react-router';
 // below (Rollup can't split a module into its own chunk if something else
 // still imports it statically through the barrel).
 import { PlaceholderPage } from '@/pages/PlaceholderPage';
-import { AppLayout, type NavLink } from '@/widgets';
+import { AgentDashboardLayoutRoute, AppLayout, type NavLink } from '@/widgets';
 import { ProtectedRoute } from '@/features/authentication';
 import { PATHS } from '@/shared/config';
 
@@ -46,6 +46,18 @@ const FavoritesPage = lazy(() =>
 const BookingsPage = lazy(() =>
   import('@/pages/BookingsPage').then((m) => ({ default: m.BookingsPage })),
 );
+const AgentPropertiesPage = lazy(() =>
+  import('@/pages/AgentPropertiesPage').then((m) => ({ default: m.AgentPropertiesPage })),
+);
+const AgentPropertyFormPage = lazy(() =>
+  import('@/pages/AgentPropertyFormPage').then((m) => ({ default: m.AgentPropertyFormPage })),
+);
+const AgentBookingsPage = lazy(() =>
+  import('@/pages/AgentBookingsPage').then((m) => ({ default: m.AgentBookingsPage })),
+);
+const AgentAnalyticsPage = lazy(() =>
+  import('@/pages/AgentAnalyticsPage').then((m) => ({ default: m.AgentAnalyticsPage })),
+);
 
 const PRIMARY_NAV_LINKS: NavLink[] = [{ label: 'Browse Properties', to: PATHS.public.properties }];
 
@@ -81,6 +93,26 @@ export const routeConfig: RouteObject[] = [
           { path: PATHS.admin.bookings, element: <PlaceholderPage title="Admin — Bookings" /> },
           { path: PATHS.admin.users, element: <PlaceholderPage title="Admin — Users" /> },
           { path: PATHS.admin.agencies, element: <PlaceholderPage title="Admin — Agencies" /> },
+        ],
+      },
+      {
+        // Agent only (Sprint 6, Gap 3) — mirrors the admin-only group above
+        // exactly. `/dashboard` itself is deliberately NOT here: it stays in
+        // the generic authenticated group and branches role at the
+        // `DashboardPage` component level instead (see that file's own
+        // comment) — `AgentDashboardLayoutRoute` only wraps these four.
+        element: <ProtectedRoute allowedRoles={['agent']} />,
+        children: [
+          {
+            element: <AgentDashboardLayoutRoute />,
+            children: [
+              { path: PATHS.authenticated.agentProperties, element: <AgentPropertiesPage /> },
+              { path: PATHS.authenticated.agentPropertyNew, element: <AgentPropertyFormPage /> },
+              { path: PATHS.authenticated.agentPropertyEdit, element: <AgentPropertyFormPage /> },
+              { path: PATHS.authenticated.agentBookings, element: <AgentBookingsPage /> },
+              { path: PATHS.authenticated.agentAnalytics, element: <AgentAnalyticsPage /> },
+            ],
+          },
         ],
       },
       { path: '*', element: <PlaceholderPage title="Not Found" /> },

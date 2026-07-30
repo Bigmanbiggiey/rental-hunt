@@ -4,15 +4,28 @@ import {
   useViewingRequestsRealtime,
   ViewingRequestList,
 } from '@/features/viewing-requests';
+import { AgentDashboardOverviewPage } from './AgentDashboardOverviewPage';
 import { Alert, AlertDescription, Skeleton } from '@/shared/ui';
 import { PATHS } from '@/shared/config';
+import { useAuth } from '@/entities/user';
 
 const SECTION_PAGE_SIZE = 5;
+
+// Gap 3 (Sprint 6 plan): `/dashboard` stays one URL, branching its content
+// by role — not a redirect to two URLs, since `ProtectedRoute`'s
+// `allowedRoles` only gates access, it can't branch content, and a redirect
+// would add an extra hop plus two bookmarkable URLs for one conceptual
+// landing page.
+function DashboardPage() {
+  const { profile } = useAuth();
+  if (profile?.role === 'agent') return <AgentDashboardOverviewPage />;
+  return <CustomerDashboardOverview />;
+}
 
 // CUST-001 (Upcoming) + CUST-002 (Completed). Realtime status updates
 // (api-design.md §11) are subscribed once for the whole page, not per
 // section, to avoid duplicate `postgres_changes` channels.
-function DashboardPage() {
+function CustomerDashboardOverview() {
   useViewingRequestsRealtime();
 
   const upcoming = useViewingRequests({
