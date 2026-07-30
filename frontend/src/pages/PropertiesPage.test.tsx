@@ -109,10 +109,20 @@ describe('PropertiesPage (integration, local Supabase) — cursor pagination', (
         const links = screen
           .getAllByRole('link')
           .filter((el) => el.getAttribute('href')?.includes('/properties/'));
-        // 7 seeded + 15 synthetic = 22 total, no duplicates.
-        expect(links.length).toBe(22);
         const hrefs = links.map((el) => el.getAttribute('href'));
+        // >= 22 (7 seeded + 15 synthetic), not === — a concurrently-running
+        // RLS test elsewhere in the suite may create its own guest-visible
+        // property fixture at the same moment (a real, documented,
+        // pre-existing cross-file timing gap against this shared, mutable
+        // table — see project-state.md's Technical Debt). What this
+        // assertion actually needs to prove is that cursor pagination
+        // doesn't drop or duplicate results, not that it can pin an exact
+        // global count on a table other tests can concurrently write to.
+        expect(links.length).toBeGreaterThanOrEqual(22);
         expect(new Set(hrefs).size).toBe(hrefs.length);
+        for (let i = 0; i < 15; i++) {
+          expect(hrefs.some((href) => href?.includes(`${EXTRA_SLUG_PREFIX}${i}`))).toBe(true);
+        }
       },
       { timeout: 10000 },
     );

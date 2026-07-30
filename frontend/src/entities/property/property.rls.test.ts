@@ -399,7 +399,13 @@ describe('submit_property_for_verification RPC (integration, local Supabase, Spr
       agencyId: NAIROBI_HOMES_AGENCY_ID,
       agentId: agentA.agentId,
       slug: `rls-verify-test-${Date.now()}`,
-      verificationStatus: 'unverified',
+      // 'rejected', not 'unverified' — the RPC accepts submission from either
+      // (both are asserted as valid source states elsewhere in this test),
+      // and 'rejected' is also the one status excluded from guest visibility
+      // (database.md §9), so this fixture doesn't inflate
+      // PropertiesPage.test.tsx's exact guest-facing count when both run in
+      // the same parallel batch.
+      verificationStatus: 'rejected',
     });
 
     const wrongAgency = await agentB.client.rpc('submit_property_for_verification', {
@@ -444,6 +450,11 @@ describe('property-images Storage RLS (integration, local Supabase, Sprint 6)', 
       agencyId: NAIROBI_HOMES_AGENCY_ID,
       agentId: agentA.agentId,
       slug: `rls-storage-test-${Date.now()}`,
+      // 'rejected' (createTestProperty's default is 'verified'/guest-visible,
+      // which is irrelevant to Storage RLS and would otherwise inflate
+      // PropertiesPage.test.tsx's exact guest-facing count — see the note
+      // on the RPC test above.
+      verificationStatus: 'rejected',
     });
     const path = `${propertyId}/test-image.jpg`;
     // A `File`'s own `.type` doesn't reliably survive into supabase-js's
