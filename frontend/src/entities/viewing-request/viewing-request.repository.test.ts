@@ -11,7 +11,13 @@ import { describe, expect, it, vi } from 'vitest';
 const mockAuthGetUser = vi.fn();
 const mockSingle = vi.fn();
 const mockSelect = vi.fn(() => ({ single: mockSingle }));
-const mockEq = vi.fn(() => ({ select: mockSelect }));
+// After the first .eq('id', id), every Sprint 6 mutation chains a
+// transition guard: either .in('status', [...]) (cancel/reschedule) or a
+// second .eq('status', ...) (confirm/complete/markNoShow) — both need to
+// land on .select().single().
+const mockGuardEq = vi.fn(() => ({ select: mockSelect }));
+const mockIn = vi.fn(() => ({ select: mockSelect }));
+const mockEq = vi.fn(() => ({ select: mockSelect, in: mockIn, eq: mockGuardEq }));
 const mockUpdate = vi.fn(() => ({ eq: mockEq }));
 const mockInsert = vi.fn(() => ({ select: mockSelect }));
 const mockFrom = vi.fn(() => ({ insert: mockInsert, update: mockUpdate }));
@@ -61,5 +67,85 @@ describe('viewingRequestRepository.cancel (unit, fake Supabase client)', () => {
     await expect(viewingRequestRepository.cancel('vr1')).rejects.toMatchObject({
       code: 'INVALID_STATE_TRANSITION',
     });
+  });
+
+  it('guards the transition with .in(status, [pending, confirmed]) — load-bearing for the agent path, per the repository comment', async () => {
+    mockSingle.mockResolvedValueOnce({
+      data: {
+        id: 'vr1',
+        customer_id: 'c1',
+        property_id: 'p1',
+        agent_id: 'a1',
+        requested_date: '2099-01-01',
+        requested_time: '10:00',
+        status: 'cancelled',
+        notes: null,
+        cancellation_reason: null,
+        created_at: '2026-07-29T00:00:00.000Z',
+        updated_at: '2026-07-29T00:00:00.000Z',
+        property: null,
+        customer: null,
+      },
+      error: null,
+    });
+
+    await viewingRequestRepository.cancel('vr1');
+
+    expect(mockIn).toHaveBeenCalledWith('status', ['pending', 'confirmed']);
+  });
+});
+
+describe('viewingRequestRepository.reschedule (unit, fake Supabase client)', () => {
+  it('normalizes a "0 rows" result to INVALID_STATE_TRANSITION', async () => {
+    mockSingle.mockResolvedValueOnce({
+      data: null,
+      error: { code: 'PGRST116', message: 'no rows', details: '', hint: '' },
+    });
+
+    await expect(
+      viewingRequestRepository.reschedule('vr1', { requestedDate: '2099-01-01', requestedTime: '10:00' }),
+    ).rejects.toMatchObject({ code: 'INVALID_STATE_TRANSITION' });
+  });
+});
+
+describe('viewingRequestRepository.confirm (unit, fake Supabase client)', () => {
+  it('guards on status = pending and normalizes a "0 rows" result to INVALID_STATE_TRANSITION', async () => {
+    mockSingle.mockResolvedValueOnce({
+      data: null,
+      error: { code: 'PGRST116', message: 'no rows', details: '', hint: '' },
+    });
+
+    await expect(viewingRequestRepository.confirm('vr1')).rejects.toMatchObject({
+      code: 'INVALID_STATE_TRANSITION',
+    });
+    expect(mockGuardEq).toHaveBeenCalledWith('status', 'pending');
+  });
+});
+
+describe('viewingRequestRepository.complete (unit, fake Supabase client)', () => {
+  it('guards on status = confirmed and normalizes a "0 rows" result to INVALID_STATE_TRANSITION', async () => {
+    mockSingle.mockResolvedValueOnce({
+      data: null,
+      error: { code: 'PGRST116', message: 'no rows', details: '', hint: '' },
+    });
+
+    await expect(viewingRequestRepository.complete('vr1')).rejects.toMatchObject({
+      code: 'INVALID_STATE_TRANSITION',
+    });
+    expect(mockGuardEq).toHaveBeenCalledWith('status', 'confirmed');
+  });
+});
+
+describe('viewingRequestRepository.markNoShow (unit, fake Supabase client)', () => {
+  it('guards on status = confirmed and normalizes a "0 rows" result to INVALID_STATE_TRANSITION', async () => {
+    mockSingle.mockResolvedValueOnce({
+      data: null,
+      error: { code: 'PGRST116', message: 'no rows', details: '', hint: '' },
+    });
+
+    await expect(viewingRequestRepository.markNoShow('vr1')).rejects.toMatchObject({
+      code: 'INVALID_STATE_TRANSITION',
+    });
+    expect(mockGuardEq).toHaveBeenCalledWith('status', 'confirmed');
   });
 });

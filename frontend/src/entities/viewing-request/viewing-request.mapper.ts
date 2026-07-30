@@ -1,6 +1,6 @@
-import type { ViewingRequest, ViewingRequestProperty } from './viewing-request.types';
+import type { ViewingRequest, ViewingRequestCustomer, ViewingRequestProperty } from './viewing-request.types';
 
-/** Shape of a `public.viewing_requests` row joined with the slim `property:properties(...)` embed, snake_case as PostgREST returns it. */
+/** Shape of a `public.viewing_requests` row joined with the slim `property:properties(...)` and `customer:profiles(...)` embeds, snake_case as PostgREST returns it. */
 export interface ViewingRequestRow {
   id: string;
   customer_id: string;
@@ -14,6 +14,7 @@ export interface ViewingRequestRow {
   created_at: string;
   updated_at: string;
   property: ViewingRequestPropertyRow | null;
+  customer: ViewingRequestCustomerRow | null;
 }
 
 export interface ViewingRequestPropertyRow {
@@ -21,6 +22,16 @@ export interface ViewingRequestPropertyRow {
   slug: string;
   title: string;
   images: { id: string; image_url: string; alt_text: string | null; display_order: number }[];
+}
+
+export interface ViewingRequestCustomerRow {
+  id: string;
+  full_name: string;
+  phone: string | null;
+}
+
+function mapCustomerRow(row: ViewingRequestCustomerRow): ViewingRequestCustomer {
+  return { id: row.id, fullName: row.full_name, phone: row.phone };
 }
 
 function mapPropertyRow(row: ViewingRequestPropertyRow): ViewingRequestProperty {
@@ -62,5 +73,6 @@ export function mapViewingRequestRow(row: ViewingRequestRow): ViewingRequest {
     property: row.property
       ? mapPropertyRow(row.property)
       : { id: row.property_id, slug: '', title: '', images: [] },
+    customer: row.customer ? mapCustomerRow(row.customer) : null,
   };
 }

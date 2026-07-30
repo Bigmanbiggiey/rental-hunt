@@ -2,18 +2,47 @@ import { supabase } from '@/shared/lib/supabase';
 import { mapSupabaseError } from '@/shared/lib/errors';
 import { mapPropertyRow, type PropertyRow } from './property.mapper';
 import { decodeCursor, encodeCursor, sortAscending, sortColumn } from './cursor';
-import type { Cursor, Property, PropertyFilters, PropertyListResult } from './property.types';
+import type {
+  AgentPropertyFilters,
+  AgentPropertyListResult,
+  CreatePropertyInput,
+  Cursor,
+  Property,
+  PropertyAvailabilityStatus,
+  PropertyFilters,
+  PropertyListResult,
+} from './property.types';
 
 export interface PropertyRepository {
   list(filters: PropertyFilters, cursor?: Cursor, limit?: number): Promise<PropertyListResult>;
   listFeatured(limit?: number): Promise<Property[]>;
   getBySlug(slug: string): Promise<Property>;
+  /** AGENT-003's edit form — fetches by id, not slug, since the id is what routing/every other agent-side method already carries. `agencyId` is an explicit, load-bearing filter (same reasoning as `listForAgent`'s own note) — without it, RLS's guest-visibility policy would still let another agency's guest-visible property be fetched (read-only; the dedicated agent-`UPDATE`-own-agency policy already blocks any actual write regardless), which would incorrectly show up in this agent's own edit form. */
+  getById(id: string, agencyId: string): Promise<Property>;
   listRelated(input: {
     propertyId: string;
     countyId: string;
     propertyTypeId: string;
     limit?: number;
   }): Promise<Property[]>;
+  /** AGENT-002. `agencyId` is trusted input from the Service layer (resolved via `getCurrentAgent()`) — RLS's `properties_insert_agent_own_agency` policy is the actual authority, this is just the mechanical write. */
+  create(agencyId: string, input: CreatePropertyInput): Promise<Property>;
+  /** AGENT-003. `agentId`/`slug` are deliberately not patchable — reassignment is out of Sprint 6's scope (Gap 6) and a slug rename would break existing links/bookmarks. */
+  update(id: string, input: Partial<CreatePropertyInput>): Promise<Property>;
+  /** AGENT-004. Bidirectional — `archived: false` un-archives, closing the obvious "archived by mistake" gap the one-directional doc example left open. */
+  archive(id: string, archived?: boolean): Promise<Property>;
+  updateAvailability(id: string, status: PropertyAvailabilityStatus): Promise<Property>;
+  /** AGENT-001/002/006's agency-wide list/search/filter — offset-paginated (database.md §14). `agencyId` is an explicit, load-bearing filter — RLS alone also permits *other* agencies' guest-visible rows through (see the implementation's own note), which is correct for public browsing but wrong for this agency-scoped view. */
+  listForAgent(
+    agencyId: string,
+    filters?: AgentPropertyFilters,
+    page?: number,
+    pageSize?: number,
+  ): Promise<AgentPropertyListResult>;
+  /** AGENT-008. Fire-and-forget from `useTrackPropertyView`; deliberately not folded into `getBySlug` (would double-count on TanStack Query refetch/refocus). */
+  incrementViewCount(id: string): Promise<void>;
+  /** AGENT-007's agent-facing half — wraps the `submit_property_for_verification` RPC (database.md §9, Gap 2); the RPC itself enforces own-agency + unverified/rejected-only. */
+  submitForVerification(id: string): Promise<Property>;
 }
 
 // api-design.md §6.1's underlying-call shape — one query, no N+1 client-side
@@ -37,6 +66,33 @@ export const PROPERTY_COLUMNS = `
 `;
 
 const DEFAULT_LIMIT = 20;
+const DEFAULT_PAGE_SIZE = 20;
+
+async function fetchById(id: string): Promise<Property> {
+  const { data, error } = await supabase
+    .from('properties')
+    .select(PROPERTY_COLUMNS)
+    .eq('id', id)
+    .single<PropertyRow>();
+  if (error) throw mapSupabaseError(error, { notFoundCode: 'PROPERTY_NOT_FOUND' });
+  return mapPropertyRow(data);
+}
+
+/** Full replace, not a diff — mirrors `reorder()`'s planned metadata-only-write shape for the same join table. */
+async function replacePropertyAmenities(propertyId: string, amenityIds: string[]): Promise<void> {
+  const { error: deleteError } = await supabase
+    .from('property_amenities')
+    .delete()
+    .eq('property_id', propertyId);
+  if (deleteError) throw mapSupabaseError(deleteError);
+
+  if (amenityIds.length === 0) return;
+
+  const { error: insertError } = await supabase
+    .from('property_amenities')
+    .insert(amenityIds.map((amenityId) => ({ property_id: propertyId, amenity_id: amenityId })));
+  if (insertError) throw mapSupabaseError(insertError);
+}
 
 /**
  * Resolves `q` (NFR-SEARCH-002, partial location/county matching) to a list
@@ -157,13 +213,31 @@ export const propertyRepository: PropertyRepository = {
   },
 
   // api-design.md §6.2. Deliberately no getBySlug-adjacent view-count
-  // increment here — no PROP-* acceptance criterion needs it, it only feeds
-  // a future AGENT-008 dashboard story; see api-design.md §6.2's own note.
+  // increment here — `incrementViewCount()` below is its own fire-and-forget
+  // call from `useTrackPropertyView`, not folded into this query, so a
+  // TanStack Query refetch/refocus on this same slug doesn't double-count.
   async getBySlug(slug) {
     const { data, error } = await supabase
       .from('properties')
       .select(PROPERTY_COLUMNS)
       .eq('slug', slug)
+      .single<PropertyRow>();
+
+    if (error) throw mapSupabaseError(error, { notFoundCode: 'PROPERTY_NOT_FOUND' });
+    return mapPropertyRow(data);
+  },
+
+  // Deliberately its own query, not the shared `fetchById()` helper below —
+  // `fetchById()` is reused by `create`/`update`/`archive`/`updateAvailability`/
+  // `submitForVerification`, all of which are already correctly scoped by
+  // RLS's agent-`UPDATE`-own-agency policy on the write side; this is the
+  // one read-only call site that needed its own explicit `agency_id` guard.
+  async getById(id, agencyId) {
+    const { data, error } = await supabase
+      .from('properties')
+      .select(PROPERTY_COLUMNS)
+      .eq('id', id)
+      .eq('agency_id', agencyId)
       .single<PropertyRow>();
 
     if (error) throw mapSupabaseError(error, { notFoundCode: 'PROPERTY_NOT_FOUND' });
@@ -186,5 +260,149 @@ export const propertyRepository: PropertyRepository = {
 
     if (error) throw mapSupabaseError(error);
     return (data ?? []).map(mapPropertyRow);
+  },
+
+  async create(agencyId, input) {
+    const { data: inserted, error: insertError } = await supabase
+      .from('properties')
+      .insert({
+        agency_id: agencyId,
+        agent_id: input.agentId,
+        slug: input.slug,
+        title: input.title,
+        description: input.description,
+        property_type_id: input.propertyTypeId,
+        county_id: input.countyId,
+        location_id: input.locationId,
+        latitude: input.latitude,
+        longitude: input.longitude,
+        bedrooms: input.bedrooms,
+        bathrooms: input.bathrooms,
+        rent_amount: input.rentAmount,
+        deposit_amount: input.depositAmount,
+        availability_status: input.availabilityStatus,
+      })
+      .select('id')
+      .single<{ id: string }>();
+
+    if (insertError) throw mapSupabaseError(insertError);
+
+    if (input.amenityIds.length > 0) {
+      await replacePropertyAmenities(inserted.id, input.amenityIds);
+    }
+
+    return fetchById(inserted.id);
+  },
+
+  async update(id, input) {
+    const patch: Record<string, unknown> = {};
+    if (input.title !== undefined) patch.title = input.title;
+    if (input.description !== undefined) patch.description = input.description;
+    if (input.propertyTypeId !== undefined) patch.property_type_id = input.propertyTypeId;
+    if (input.countyId !== undefined) patch.county_id = input.countyId;
+    if (input.locationId !== undefined) patch.location_id = input.locationId;
+    if (input.latitude !== undefined) patch.latitude = input.latitude;
+    if (input.longitude !== undefined) patch.longitude = input.longitude;
+    if (input.bedrooms !== undefined) patch.bedrooms = input.bedrooms;
+    if (input.bathrooms !== undefined) patch.bathrooms = input.bathrooms;
+    if (input.rentAmount !== undefined) patch.rent_amount = input.rentAmount;
+    if (input.depositAmount !== undefined) patch.deposit_amount = input.depositAmount;
+    if (input.availabilityStatus !== undefined) patch.availability_status = input.availabilityStatus;
+
+    if (input.amenityIds !== undefined) {
+      await replacePropertyAmenities(id, input.amenityIds);
+    }
+
+    if (Object.keys(patch).length === 0) {
+      return fetchById(id);
+    }
+
+    const { data, error } = await supabase
+      .from('properties')
+      .update(patch)
+      .eq('id', id)
+      .select(PROPERTY_COLUMNS)
+      .single<PropertyRow>();
+
+    if (error) throw mapSupabaseError(error, { notFoundCode: 'PROPERTY_NOT_FOUND' });
+    return mapPropertyRow(data);
+  },
+
+  async archive(id, archived = true) {
+    const { data, error } = await supabase
+      .from('properties')
+      .update({ is_archived: archived })
+      .eq('id', id)
+      .select(PROPERTY_COLUMNS)
+      .single<PropertyRow>();
+
+    if (error) throw mapSupabaseError(error, { notFoundCode: 'PROPERTY_NOT_FOUND' });
+    return mapPropertyRow(data);
+  },
+
+  async updateAvailability(id, status) {
+    const { data, error } = await supabase
+      .from('properties')
+      .update({ availability_status: status })
+      .eq('id', id)
+      .select(PROPERTY_COLUMNS)
+      .single<PropertyRow>();
+
+    if (error) throw mapSupabaseError(error, { notFoundCode: 'PROPERTY_NOT_FOUND' });
+    return mapPropertyRow(data);
+  },
+
+  // A real cross-agency leak was found here via manual browser testing
+  // (not caught by the RLS test suite, which deliberately used non-guest-
+  // visible fixtures to isolate the agent-specific policy): RLS's guest-
+  // visibility policy has no role restriction, so it also grants an agent
+  // read access to *other* agencies' guest-visible (non-archived,
+  // non-rejected) properties — correct and intended for public browsing,
+  // but wrong for "my own agency's management list," which must be
+  // narrower than what RLS alone permits. `agencyId` is therefore an
+  // explicit, load-bearing filter here, not a defensive extra — mirroring
+  // `create()`'s existing `(agencyId, input)` signature.
+  async listForAgent(agencyId, filters = {}, page = 1, pageSize = DEFAULT_PAGE_SIZE) {
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+
+    let query = supabase
+      .from('properties')
+      .select(PROPERTY_COLUMNS, { count: 'exact' })
+      .eq('agency_id', agencyId)
+      .order('created_at', { ascending: false })
+      .range(from, to);
+
+    if (filters.archived !== undefined) query = query.eq('is_archived', filters.archived);
+    if (filters.availabilityStatus) query = query.eq('availability_status', filters.availabilityStatus);
+    if (filters.verificationStatus) query = query.eq('verification_status', filters.verificationStatus);
+    if (filters.q) query = query.or(`title.ilike.%${filters.q}%,description.ilike.%${filters.q}%`);
+
+    const { data, error, count } = await query.returns<PropertyRow[]>();
+    if (error) throw mapSupabaseError(error);
+
+    const total = count ?? 0;
+    return {
+      data: (data ?? []).map(mapPropertyRow),
+      meta: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
+    };
+  },
+
+  // Errors deliberately swallowed by the caller (`useTrackPropertyView`), not
+  // here — this repository method still surfaces a real AppError so a unit
+  // test can assert on it; api-design.md §6.2's "fire-and-forget" note is
+  // about the Hook's handling, not this layer's.
+  async incrementViewCount(id) {
+    const { error } = await supabase.rpc('increment_property_view_count', { p_property_id: id });
+    if (error) throw mapSupabaseError(error);
+  },
+
+  // The RPC returns the raw `properties` row (not the joined PROPERTY_COLUMNS
+  // shape) — re-fetched via `fetchById` so the caller gets the full DTO,
+  // same two-step shape as `create()`.
+  async submitForVerification(id) {
+    const { error } = await supabase.rpc('submit_property_for_verification', { p_property_id: id });
+    if (error) throw mapSupabaseError(error, { notFoundCode: 'PROPERTY_NOT_FOUND' });
+    return fetchById(id);
   },
 };

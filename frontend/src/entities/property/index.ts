@@ -2,6 +2,8 @@ export * from './property.types';
 export * from './property.mapper';
 export * from './cursor';
 export * from './property.repository';
+export * from './property-image.mapper';
+export * from './property-image.repository';
 export * from './referenceData.repository';
 export * from './AvailabilityBadge';
 export * from './VerificationBadge';

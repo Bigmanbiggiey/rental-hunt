@@ -189,6 +189,10 @@ Examples:
 * Favorites
 * Viewing Requests
 * Profile Management
+* Agent Properties (Sprint 6 — AGENT-002–007's create/edit/archive/images/availability/verification-submission)
+* Agent Bookings (Sprint 6 — BOOK-001–006's queue and status transitions)
+* Agent Dashboard (Sprint 6 — AGENT-001's summary counts)
+* Agent Analytics (Sprint 6 — AGENT-008's basic per-property view/request charts)
 
 Each feature owns:
 
@@ -214,6 +218,7 @@ Examples:
 * Booking
 * Agency
 * Amenity
+* Agent (added Sprint 6 — `getCurrentAgent()`; cross-cutting across every agent-dashboard feature, per the same "3+ real consumers" test already applied to `Booking`/`ViewingRequest`)
 
 Each entity contains:
 
@@ -255,10 +260,20 @@ Includes:
 
 ## Authenticated Routes
 
-* /dashboard
+* /dashboard — role-aware (Sprint 6): renders `AgentDashboardOverviewPage` for an agent, the customer overview otherwise. One URL, not a redirect to two — `DashboardPage` branches by `profile.role` at the component level, since `ProtectedRoute`'s `allowedRoles` can only gate access, not branch content.
 * /favorites
 * /bookings
 * /profile
+
+## Agent Routes (role = agent only, Sprint 6)
+
+Nested under `/dashboard` specifically to avoid colliding with the customer's own top-level `/bookings` (Sprint 5's full viewing-history page). Wrapped by their own layout route, `AgentDashboardLayoutRoute` (`widgets/agent-dashboard-layout/`) — a 256px sidebar + top nav shell (`ui-guidelines.md` §7.4/§13.7/§13.8) — mirroring the admin-only route group's own `<ProtectedRoute allowedRoles={[...]}/>` pattern exactly. `/dashboard` itself is deliberately **not** in this group (see the note above); `AgentDashboardOverviewPage` self-wraps with the same shell component directly instead, since `AgentDashboardLayout` takes `children` rather than always rendering its own `<Outlet/>`.
+
+* /dashboard/properties
+* /dashboard/properties/new
+* /dashboard/properties/:id/edit
+* /dashboard/bookings
+* /dashboard/analytics
 
 ---
 

@@ -111,3 +111,51 @@ export interface PropertyListResult {
   data: Property[];
   meta: PropertyListMeta;
 }
+
+/**
+ * api-design.md §14's `CreatePropertySchema` fields, plus three
+ * Service-resolved additions the Zod schema itself never carries:
+ * `agentId`/`slug` (assembled by `agent-property.service.ts`'s `create()`,
+ * mirroring `viewingRequestService.create()`'s `{ ...resolved, ...parsed }`
+ * pattern) and `availabilityStatus` (AGENT-002's acceptance criteria list
+ * availability as a captured field; the documented schema example omitted
+ * it — added here, Service defaults it to `'available'`).
+ */
+export interface CreatePropertyInput {
+  title: string;
+  description: string;
+  propertyTypeId: UUID;
+  countyId: UUID;
+  locationId: UUID;
+  latitude: number;
+  longitude: number;
+  bedrooms: number;
+  bathrooms: number;
+  rentAmount: number;
+  depositAmount: number;
+  amenityIds: UUID[];
+  availabilityStatus: PropertyAvailabilityStatus;
+  agentId: UUID;
+  slug: string;
+}
+
+/** The agent's own agency-wide listing view (AGENT-002/003/004/006) — offset-paginated (database.md §14), distinct from the public cursor-paginated `list()`. */
+export interface AgentPropertyFilters {
+  q?: string;
+  availabilityStatus?: PropertyAvailabilityStatus;
+  verificationStatus?: PropertyVerificationStatus;
+  archived?: boolean;
+}
+
+/** api-design.md §16.2 — offset pagination shape shared with Favorites/ViewingRequests. */
+export interface AgentPropertyListMeta {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface AgentPropertyListResult {
+  data: Property[];
+  meta: AgentPropertyListMeta;
+}

@@ -234,6 +234,12 @@ interface ViewingRequest {
   createdAt: ISODateTime;
   updatedAt: ISODateTime;
   property?: Pick<Property, 'id' | 'slug' | 'title' | 'images'>; // expanded on list endpoints
+  // Sprint 6, BOOK-001 — `{ id, fullName, phone } | null`, resolved via
+  // `profiles_select_own_customers_by_agent` (database.md §9). One shared
+  // shape for both actors rather than two near-duplicate query columns: for
+  // a customer's own listForCustomer()/cancel() call this just embeds their
+  // own profile back to them (already allowed regardless of role).
+  customer: { id: UUID; fullName: string; phone: string | null } | null;
 }
 
 interface PropertyVerification {
@@ -458,7 +464,7 @@ Route prefix: none (logical root). All routes below are the Repository's contrac
 | **Permissions** | Public, subject to the same visibility rule as §6.1. |
 | **Errors** | `PROPERTY_NOT_FOUND` |
 | **Pagination** | N/A (single resource). |
-| **View count** | `properties.view_count` (§5.8) is **not** incremented by this endpoint. An earlier draft of this line described a fire-and-forget `increment_view_count` RPC, but no `PROP-*` acceptance criterion requires view counting — it only feeds a future Agent Dashboard story (`AGENT-008`). Deliberately not built until that story needs it, rather than speculatively. |
+| **View count** | `properties.view_count` (§5.8) is **not** incremented by this endpoint — built instead as its own call (Sprint 6, `AGENT-008`): `propertyRepository.incrementViewCount(id)` → `supabase.rpc('increment_property_view_count', { p_property_id: id })`, `security definer` since RLS can't scope a single-column update and both guests and customers view details (`execute` granted to `anon, authenticated`). Fired once via `useTrackPropertyView`'s `useEffect` on `PropertyDetailPage` mount, deliberately **not** folded into this endpoint's own query — a TanStack Query refetch/refocus on the same slug would otherwise double-count. Errors are swallowed client-side (no user-facing state depends on this call succeeding), but the Repository method itself still surfaces a real `AppError` so it stays unit-testable. |
 
 ## 6.3 Search Properties
 
@@ -496,11 +502,13 @@ Also not a separate endpoint — see §17 for the full filter parameter referenc
 | Operation | Method / Route | Repository Function | Permissions |
 |---|---|---|---|
 | List | `GET /properties/:id/images` | `propertyImageRepository.listByProperty(propertyId)` | Public (parent property visible) |
-| Create (metadata) | `POST /properties/:id/images` | `propertyImageRepository.create(propertyId, { imageUrl, altText, displayOrder })` | Agent (own property), Admin — see §10 for the upload flow this follows |
+| Upload | `POST /properties/:id/images` | `propertyImageRepository.upload(propertyId, file: File, altText?: string)` | Agent (own agency's property), Admin |
 | Delete | `DELETE /properties/:id/images/:imageId` | `propertyImageRepository.delete(imageId)` | Agent (own property), Admin |
 | Reorder | `PATCH /properties/:id/images/reorder` | `propertyImageRepository.reorder(propertyId, orderedImageIds: UUID[])` | Agent (own property), Admin |
 
-`Response Schema`: `PropertyImage[]` for list/reorder, `PropertyImage` for create. `Errors`: `PROPERTY_NOT_FOUND`, `IMAGE_NOT_FOUND`, `FORBIDDEN`.
+**Upload (Sprint 6, `AGENT-005`) is the real two-step flow (§10.1) as one method, not a metadata-only `create`** (corrected — an earlier draft of this row assumed the file was already uploaded elsewhere): Storage upload to `{propertyId}/{crypto.randomUUID()}-{file.name}` (`database.md` §10's `property-images` bucket), then a `property_images` metadata insert with `display_order` = `max(display_order) + 1` for that property. On a metadata-insert failure, the just-uploaded Storage object is removed before rethrowing — the concrete mechanism behind `AGENT-005`'s "upload failures do not corrupt or remove existing images." `delete()` removes the DB row first (immediate gallery update), then best-effort removes the Storage object (an orphaned object on failure is a minor cost, not a correctness bug, since the DB row is the gallery's source of truth). `reorder()` is metadata-only, one `display_order` update per id.
+
+`Response Schema`: `PropertyImage[]` for list/reorder, `PropertyImage` for upload. `Errors`: `VALIDATION_ERROR` (wrong file type/size, checked client-side by `validatePropertyImageFile()`, §14), `PROPERTY_NOT_FOUND`, `IMAGE_NOT_FOUND`, `STORAGE_ERROR`, `FORBIDDEN`.
 
 ## 6.8 Property Availability
 
@@ -526,6 +534,20 @@ Also not a separate endpoint — see §17 for the full filter parameter referenc
 | **Validation** | `reason` required when `status = 'rejected'` (enforced inside the RPC, not a table `CHECK`, per `database.md` §5.15). |
 | **Permissions** | Moderator, Admin only. |
 | **Errors** | `VALIDATION_ERROR`, `FORBIDDEN`, `PROPERTY_NOT_FOUND` |
+
+## 6.10 Submit Property For Verification
+
+Sprint 6, `AGENT-007`'s agent-facing half — built ahead of §6.9's moderator/admin approve/reject action (Sprint 7), which this endpoint is deliberately narrower than: it only ever moves a listing to `pending_verification`, never touches `verified_by`/`last_verified_at`, and never writes `property_verifications` (doesn't exist yet).
+
+| | |
+|---|---|
+| **Method / Route** | `POST /properties/:id/submit-verification` |
+| **Repository Function** | `propertyRepository.submitForVerification(id: UUID)` |
+| **Underlying call** | `supabase.rpc('submit_property_for_verification', { p_property_id: id })`, then a re-fetch by id for the full embedded `Property` DTO (the RPC itself returns only the raw `properties` row). `security definer`, checks `current_role() = 'agent'` and own-agency ownership internally (`database.md` §9) — RLS is not the enforcement layer here, the RPC's own guard clause is. |
+| **Response Schema** | `Property` |
+| **Validation** | Only allowed while `verification_status IN ('unverified', 'rejected')`. |
+| **Permissions** | Agent, own agency only. |
+| **Errors** | `FORBIDDEN` (wrong agency or not an agent — `42501`), `INVALID_STATE_TRANSITION` (wrong source status — dedicated errcode `RH002`, mapped like `RH001`), `PROPERTY_NOT_FOUND` |
 
 ---
 
@@ -648,7 +670,8 @@ stateDiagram-v2
 | | |
 |---|---|
 | **Method / Route** | `GET /viewing-requests?scope=agency` |
-| **Repository Function** | `viewingRequestRepository.listForAgent(status?: ViewingStatus[], page = 1, pageSize = 20)` (`BOOK-001`) |
+| **Repository Function** | `viewingRequestRepository.listForAgent(input?: ListViewingRequestsInput)` (`BOOK-001`) — the same options-object signature as `listForCustomer` (`{ status?, page?, pageSize?, sort? }`), not the positional `(status?, page, pageSize)` this row originally documented; kept in lockstep with §8.3's own already-corrected signature rather than drifting into a second, inconsistent shape. |
+| **Response includes** | Each `ViewingRequest.customer` (`{ id, fullName, phone }`) is populated here — `listForCustomer`'s own call leaves it populated too (it's simply the caller's own profile), but this is the endpoint that actually needs it: BOOK-001's "customer, property, requested date/time, status" (`database.md` §9, Gap 6's `profiles_select_own_customers_by_agent` policy). |
 | **Permissions** | Agent (rows where `agent_id` is their own), Moderator/Admin (all). |
 | **Pagination** | Offset (§16.2). |
 
@@ -821,12 +844,17 @@ interface PropertyRepository {
   list(filters: PropertyFilters, cursor?: string, limit?: number): Promise<{ data: Property[]; meta: CursorMeta }>;
   listFeatured(limit?: number): Promise<Property[]>;
   getBySlug(slug: string): Promise<Property>;
+  getById(id: string): Promise<Property>; // Sprint 6 — the agent edit form fetches by id, not slug
+  listRelated(input: { propertyId: string; countyId: string; propertyTypeId: string; limit?: number }): Promise<Property[]>;
   create(agencyId: string, input: CreatePropertyInput): Promise<Property>;
   update(id: string, input: Partial<CreatePropertyInput>): Promise<Property>;
-  archive(id: string): Promise<Property>;
+  archive(id: string, archived?: boolean): Promise<Property>; // Sprint 6 — bidirectional, `archived: false` un-archives
   updateAvailability(id: string, status: PropertyStatus): Promise<Property>;
+  listForAgent(agencyId: string, filters?: AgentPropertyFilters, page?: number, pageSize?: number): Promise<{ data: Property[]; meta: PageMeta }>; // Sprint 6, AGENT-001/002/006 — offset-paginated, distinct from list()'s cursor pagination. `agencyId` is explicit and load-bearing — found via manual testing that RLS's guest-visibility policy (no role restriction) also lets *other* agencies' guest-visible properties through an unscoped query
+  incrementViewCount(id: string): Promise<void>; // Sprint 6, AGENT-008
+  submitForVerification(id: string): Promise<Property>; // Sprint 6, AGENT-007's agent-facing half — §6.10
 }
-// Errors: VALIDATION_ERROR, PROPERTY_NOT_FOUND, FORBIDDEN
+// Errors: VALIDATION_ERROR, PROPERTY_NOT_FOUND, FORBIDDEN, INVALID_STATE_TRANSITION, STORAGE_ERROR
 
 interface PropertyImageRepository {
   listByProperty(propertyId: string): Promise<PropertyImage[]>;
@@ -843,17 +871,29 @@ interface FavoritesRepository {
 }
 // Errors: UNAUTHENTICATED, PROPERTY_NOT_FOUND
 
+interface ListViewingRequestsInput {
+  status?: ViewingStatus[];
+  page?: number;
+  pageSize?: number;
+  sort?: 'requestedDateAsc' | 'requestedDateDesc' | 'createdAtDesc'; // Sprint 5 — one method serves every ordering need (§8.3)
+}
+
 interface ViewingRequestRepository { // "BookingRepository"
   create(input: CreateViewingRequestInput): Promise<ViewingRequest>;
-  listForCustomer(status?: ViewingStatus[], page?: number, pageSize?: number): Promise<{ data: ViewingRequest[]; meta: PageMeta }>;
-  listForAgent(status?: ViewingStatus[], page?: number, pageSize?: number): Promise<{ data: ViewingRequest[]; meta: PageMeta }>;
-  reschedule(id: string, input: { requestedDate: string; requestedTime: string }): Promise<ViewingRequest>;
-  cancel(id: string, reason?: string): Promise<ViewingRequest>;
-  confirm(id: string): Promise<ViewingRequest>;
-  complete(id: string): Promise<ViewingRequest>;
-  markNoShow(id: string): Promise<ViewingRequest>;
+  listForCustomer(input?: ListViewingRequestsInput): Promise<{ data: ViewingRequest[]; meta: PageMeta }>;
+  listForAgent(input?: ListViewingRequestsInput): Promise<{ data: ViewingRequest[]; meta: PageMeta }>; // Sprint 6, BOOK-001
+  reschedule(id: string, input: { requestedDate: string; requestedTime: string }): Promise<ViewingRequest>; // Sprint 6, BOOK-003
+  cancel(id: string, reason?: string): Promise<ViewingRequest>; // shared by VIEW-004 (customer) and BOOK-004 (agent, Sprint 6)
+  confirm(id: string): Promise<ViewingRequest>; // Sprint 6, BOOK-002
+  complete(id: string): Promise<ViewingRequest>; // Sprint 6, BOOK-005
+  markNoShow(id: string): Promise<ViewingRequest>; // Sprint 6, BOOK-006
 }
 // Errors: VALIDATION_ERROR, PROPERTY_NOT_FOUND, PROPERTY_NOT_AVAILABLE, INVALID_STATE_TRANSITION, FORBIDDEN
+
+interface AgentRepository { // Sprint 6, new entities/ slice — resolves "my own agent/agency" for every agent-dashboard feature
+  getCurrentAgent(profileId: string): Promise<Agent>;
+}
+// Errors: AGENT_NOT_FOUND
 
 interface AgencyRepository {
   list(filters?: { county?: string }): Promise<Agency[]>;
@@ -912,6 +952,21 @@ export const CreatePropertySchema = z.object({
   rentAmount: z.number().positive(),
   depositAmount: z.number().nonnegative(),
   amenityIds: z.array(z.string().uuid()).max(20),
+  // Added Sprint 6 — AGENT-002's AC lists availability among the fields the
+  // creation form captures; this draft originally omitted it. Not part of
+  // CreatePropertyInput's Service-resolved additions (agentId/slug, §13) —
+  // the agent picks this one directly in the form.
+  availabilityStatus: z.enum(['available', 'reserved', 'occupied', 'hidden']),
+});
+// UpdatePropertySchema = CreatePropertySchema.partial() — AGENT-003's "same rules as creation," applied to whichever fields the edit actually changed.
+
+// Sprint 6, BOOK-003 — mirrors CreateViewingRequestSchema's date/time validation.
+export const RescheduleViewingRequestSchema = z.object({
+  requestedDate: z.string().refine(
+    (val) => new Date(val) >= new Date(new Date().toDateString()),
+    'Requested date must be today or later.'
+  ),
+  requestedTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Enter a valid time (HH:mm).'),
 });
 
 export const SetVerificationSchema = z.object({

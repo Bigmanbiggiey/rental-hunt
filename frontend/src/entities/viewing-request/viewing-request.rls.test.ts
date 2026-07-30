@@ -310,6 +310,155 @@ describe('viewing_requests RLS (integration, local Supabase)', () => {
     expect(agentUpdate.data?.status).toBe('confirmed');
   });
 
+  it('Sprint 6: a second agent (different agency, not assigned) cannot confirm/reschedule/cancel/complete/no-show a request assigned to another agent', async () => {
+    const customer = await signUpActor('customerM');
+    createdClients.push(customer.client);
+    const prop = await property(AVAILABLE_SLUG);
+
+    const agentActor = await signUpActor('agentB', 'agent');
+    createdClients.push(agentActor.client);
+    const { data: seededAgent } = await serviceClient
+      .from('agents')
+      .select('agency_id')
+      .eq('id', prop.agent_id)
+      .single();
+    const { data: ownAgent } = await serviceClient
+      .from('agents')
+      .insert({ profile_id: agentActor.userId, agency_id: seededAgent!.agency_id })
+      .select('id')
+      .single();
+
+    const otherAgentActor = await signUpActor('agentC', 'agent');
+    createdClients.push(otherAgentActor.client);
+    await serviceClient
+      .from('agents')
+      .insert({ profile_id: otherAgentActor.userId, agency_id: 'a2000000-0000-0000-0000-000000000002' })
+      .select('id')
+      .single();
+
+    const { data: created } = await customer.client
+      .from('viewing_requests')
+      .insert({
+        customer_id: customer.userId,
+        property_id: prop.id,
+        agent_id: ownAgent!.id,
+        requested_date: tomorrow(),
+        requested_time: '09:00',
+      })
+      .select('id')
+      .single();
+
+    // Not assigned to this request at all — RLS filters the row out entirely.
+    const otherView = await otherAgentActor.client
+      .from('viewing_requests')
+      .select('id')
+      .eq('id', created!.id)
+      .maybeSingle();
+    expect(otherView.data).toBeNull();
+
+    const confirmAttempt = await otherAgentActor.client
+      .from('viewing_requests')
+      .update({ status: 'confirmed', confirmed_at: new Date().toISOString() })
+      .eq('id', created!.id)
+      .select('status')
+      .single();
+    expect(confirmAttempt.error).not.toBeNull();
+
+    const rescheduleAttempt = await otherAgentActor.client
+      .from('viewing_requests')
+      .update({ requested_time: '10:30' })
+      .eq('id', created!.id)
+      .select('requested_time')
+      .single();
+    expect(rescheduleAttempt.error).not.toBeNull();
+
+    const cancelAttempt = await otherAgentActor.client
+      .from('viewing_requests')
+      .update({ status: 'cancelled', cancelled_at: new Date().toISOString() })
+      .eq('id', created!.id)
+      .select('status')
+      .single();
+    expect(cancelAttempt.error).not.toBeNull();
+
+    const check = await serviceClient.from('viewing_requests').select('status').eq('id', created!.id).single();
+    expect(check.data?.status).toBe('pending');
+
+    // The owning agent CAN confirm it — proving the block above is about
+    // ownership, not a broken policy that blocks everyone.
+    const ownConfirm = await agentActor.client
+      .from('viewing_requests')
+      .update({ status: 'confirmed', confirmed_at: new Date().toISOString() })
+      .eq('id', created!.id)
+      .select('status')
+      .single();
+    expect(ownConfirm.error).toBeNull();
+
+    const otherComplete = await otherAgentActor.client
+      .from('viewing_requests')
+      .update({ status: 'completed', completed_at: new Date().toISOString() })
+      .eq('id', created!.id)
+      .select('status')
+      .single();
+    expect(otherComplete.error).not.toBeNull();
+
+    const otherNoShow = await otherAgentActor.client
+      .from('viewing_requests')
+      .update({ status: 'no_show' })
+      .eq('id', created!.id)
+      .select('status')
+      .single();
+    expect(otherNoShow.error).not.toBeNull();
+  });
+
+  it('Sprint 6, Gap 6: an agent can read the customer profile for their own assigned request, but not for one that isn’t theirs', async () => {
+    const customer = await signUpActor('customerN');
+    createdClients.push(customer.client);
+    const prop = await property(AVAILABLE_SLUG);
+
+    const agentActor = await signUpActor('agentD', 'agent');
+    createdClients.push(agentActor.client);
+    const { data: seededAgent } = await serviceClient
+      .from('agents')
+      .select('agency_id')
+      .eq('id', prop.agent_id)
+      .single();
+    const { data: ownAgent } = await serviceClient
+      .from('agents')
+      .insert({ profile_id: agentActor.userId, agency_id: seededAgent!.agency_id })
+      .select('id')
+      .single();
+
+    const unrelatedAgentActor = await signUpActor('agentE', 'agent');
+    createdClients.push(unrelatedAgentActor.client);
+    await serviceClient
+      .from('agents')
+      .insert({ profile_id: unrelatedAgentActor.userId, agency_id: 'a2000000-0000-0000-0000-000000000002' })
+      .select('id')
+      .single();
+
+    await customer.client.from('viewing_requests').insert({
+      customer_id: customer.userId,
+      property_id: prop.id,
+      agent_id: ownAgent!.id,
+      requested_date: tomorrow(),
+      requested_time: '08:00',
+    });
+
+    const ownAgentRead = await agentActor.client
+      .from('profiles')
+      .select('id, full_name')
+      .eq('id', customer.userId)
+      .maybeSingle();
+    expect(ownAgentRead.data?.id).toBe(customer.userId);
+
+    const unrelatedAgentRead = await unrelatedAgentActor.client
+      .from('profiles')
+      .select('id, full_name')
+      .eq('id', customer.userId)
+      .maybeSingle();
+    expect(unrelatedAgentRead.data).toBeNull();
+  });
+
   it('a moderator can see every viewing request; an admin has full CRUD', async () => {
     const customer = await signUpActor('customerL');
     const moderator = await signUpActor('moderatorA', 'moderator');

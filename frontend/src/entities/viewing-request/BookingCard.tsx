@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import { CalendarClock } from 'lucide-react';
 import { Button, Card } from '@/shared/ui';
@@ -10,20 +11,23 @@ function propertyDetailPath(slug: string): string {
 }
 
 // ui-guidelines.md §12.10 — shared shape between the Customer Dashboard
-// (VIEW-005) and, in a future Sprint 6 pass, the Agent's booking queue
-// (BOOK-001). Deliberately customer-scoped this sprint: `onCancelClick` is
-// the only action wired up (agent actions — confirm/reschedule/complete/
-// no-show — aren't built yet), so the component doesn't render affordances
-// for behavior that doesn't exist, but its shape doesn't need a rewrite to
-// grow those actions later.
+// (VIEW-005) and the Agent's booking queue (BOOK-001, Sprint 6). `actions`
+// lets the agent side pass its own action set (`BookingActionsMenu`) in
+// place of the customer-only Cancel button, and `showCustomer` surfaces
+// Sprint 6's `customer` embed (Gap 6) — additive, so the pre-existing
+// customer-side usage (`onCancelClick` alone) is unchanged.
 export function BookingCard({
   viewingRequest,
   onCancelClick,
   isCancelling = false,
+  showCustomer = false,
+  actions,
 }: {
   viewingRequest: ViewingRequest;
   onCancelClick?: () => void;
   isCancelling?: boolean;
+  showCustomer?: boolean;
+  actions?: ReactNode;
 }) {
   const { property } = viewingRequest;
   const primaryImage = property.images[0];
@@ -58,10 +62,17 @@ export function BookingCard({
           <CalendarClock className="size-3.5 shrink-0" aria-hidden="true" />
           {viewingRequest.requestedDate} at {viewingRequest.requestedTime}
         </p>
+        {showCustomer && viewingRequest.customer && (
+          <p className="text-body-sm text-muted-foreground">
+            {viewingRequest.customer.fullName}
+            {viewingRequest.customer.phone ? ` · ${viewingRequest.customer.phone}` : ''}
+          </p>
+        )}
         <ViewingStatusBadge status={viewingRequest.status} />
       </div>
 
-      {canCancel && (
+      {actions}
+      {!actions && canCancel && (
         <Button variant="outline" size="sm" isLoading={isCancelling} onClick={onCancelClick}>
           Cancel
         </Button>

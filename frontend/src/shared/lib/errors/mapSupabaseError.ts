@@ -1,3 +1,4 @@
+import { StorageApiError } from '@supabase/supabase-js';
 import { AppError, type ErrorCode } from './appError';
 
 interface AuthErrorLike {
@@ -59,6 +60,7 @@ const POSTGREST_ERROR_CODE_MAP: Partial<Record<string, ErrorCode>> = {
   '42501': 'FORBIDDEN', // insufficient_privilege (RLS rejection)
   PGRST116: 'FORBIDDEN', // 0 or >1 rows for .single() — most often an RLS-filtered miss
   RH001: 'PROPERTY_NOT_AVAILABLE', // prevent_booking_unavailable_property() trigger (database.md §9) — a dedicated errcode so this specific rejection doesn't fall through to the generic DATABASE_ERROR default.
+  RH002: 'INVALID_STATE_TRANSITION', // submit_property_for_verification() RPC (database.md §9, Sprint 6) — wrong-source-status case; reuses the existing code rather than adding a new one-off.
 };
 
 export interface MapSupabaseErrorOptions {
@@ -74,6 +76,10 @@ export interface MapSupabaseErrorOptions {
  */
 export function mapSupabaseError(error: unknown, options: MapSupabaseErrorOptions = {}): AppError {
   if (error instanceof AppError) return error;
+
+  if (error instanceof StorageApiError) {
+    return new AppError('STORAGE_ERROR', friendlyMessage('STORAGE_ERROR'), null);
+  }
 
   if (isPostgrestErrorLike(error)) {
     if (error.code === 'PGRST116' && options.notFoundCode) {
@@ -117,6 +123,8 @@ function friendlyMessage(code: ErrorCode): string {
       return 'This profile could not be found.';
     case 'IMAGE_NOT_FOUND':
       return 'This image could not be found.';
+    case 'AGENT_NOT_FOUND':
+      return 'This agent could not be found.';
     case 'EMAIL_ALREADY_REGISTERED':
       return 'An account with this email already exists.';
     case 'CONFLICT':
