@@ -18,23 +18,36 @@
 
 -- ── Agent identities (fires handle_new_user, creating `profiles` rows) ──────
 
+-- `confirmation_token`/`recovery_token`/`email_change_token_new`/`email_change`
+-- have no column default (NULL unless set) — GoTrue's Go SQL driver errors
+-- scanning NULL into these on a *login* request ("Scan error on column
+-- index 3... converting NULL to string is unsupported"), even though the
+-- exact same row is readable for other purposes. Never surfaced before
+-- because every prior verification signed a fresh user up through the real
+-- app flow (which lets GoTrue set these itself) rather than logging in with
+-- a directly-seeded row. Explicit `''` on all four avoids it.
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
-  created_at, updated_at
+  created_at, updated_at,
+  confirmation_token, recovery_token, email_change_token_new, email_change
 ) values
   ('00000000-0000-0000-0000-000000000000', 'a1000000-0000-0000-0000-000000000001', 'authenticated', 'authenticated',
    'agent1.seed@rentalhunt.test', extensions.crypt('seed-password-not-real', extensions.gen_salt('bf')),
-   now(), '{"provider":"email","providers":["email"]}', '{"full_name":"Wanjiru Kamau"}', now(), now()),
+   now(), '{"provider":"email","providers":["email"]}', '{"full_name":"Wanjiru Kamau"}', now(), now(),
+   '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000', 'a1000000-0000-0000-0000-000000000002', 'authenticated', 'authenticated',
    'agent2.seed@rentalhunt.test', extensions.crypt('seed-password-not-real', extensions.gen_salt('bf')),
-   now(), '{"provider":"email","providers":["email"]}', '{"full_name":"James Mwangi"}', now(), now()),
+   now(), '{"provider":"email","providers":["email"]}', '{"full_name":"James Mwangi"}', now(), now(),
+   '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000', 'a1000000-0000-0000-0000-000000000003', 'authenticated', 'authenticated',
    'agent3.seed@rentalhunt.test', extensions.crypt('seed-password-not-real', extensions.gen_salt('bf')),
-   now(), '{"provider":"email","providers":["email"]}', '{"full_name":"Aisha Noor"}', now(), now()),
+   now(), '{"provider":"email","providers":["email"]}', '{"full_name":"Aisha Noor"}', now(), now(),
+   '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000', 'a1000000-0000-0000-0000-000000000004', 'authenticated', 'authenticated',
    'agent4.seed@rentalhunt.test', extensions.crypt('seed-password-not-real', extensions.gen_salt('bf')),
-   now(), '{"provider":"email","providers":["email"]}', '{"full_name":"Brian Otieno"}', now(), now());
+   now(), '{"provider":"email","providers":["email"]}', '{"full_name":"Brian Otieno"}', now(), now(),
+   '', '', '', '');
 
 -- prevent_self_role_change_trigger (auth_foundation.sql) only bypasses for
 -- auth.role() = 'service_role', which this raw seed session running as the
@@ -162,3 +175,53 @@ select 'a4000000-0000-0000-0000-000000000003', a.id
 from public.amenities a
 where a.name in ('Swimming Pool', 'Backup Generator', 'Gym', 'Furnished')
 on conflict do nothing;
+
+-- ── Customer identities (fires handle_new_user; role defaults to 'customer', no trigger-disable needed) ──
+
+insert into auth.users (
+  instance_id, id, aud, role, email, encrypted_password,
+  email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
+  created_at, updated_at,
+  confirmation_token, recovery_token, email_change_token_new, email_change
+) values
+  ('00000000-0000-0000-0000-000000000000', 'c1000000-0000-0000-0000-000000000001', 'authenticated', 'authenticated',
+   'customer1.seed@rentalhunt.test', extensions.crypt('seed-password-not-real', extensions.gen_salt('bf')),
+   now(), '{"provider":"email","providers":["email"]}', '{"full_name":"Grace Achieng"}', now(), now(),
+   '', '', '', ''),
+  ('00000000-0000-0000-0000-000000000000', 'c1000000-0000-0000-0000-000000000002', 'authenticated', 'authenticated',
+   'customer2.seed@rentalhunt.test', extensions.crypt('seed-password-not-real', extensions.gen_salt('bf')),
+   now(), '{"provider":"email","providers":["email"]}', '{"full_name":"Peter Kariuki"}', now(), now(),
+   '', '', '', '');
+
+update public.profiles set phone = '+254711000001' where id = 'c1000000-0000-0000-0000-000000000001';
+update public.profiles set phone = '+254711000002' where id = 'c1000000-0000-0000-0000-000000000002';
+
+-- ── Viewing requests ─────────────────────────────────────────────────────────
+-- Sprint 6 (BOOK-*) needs at least one row per status to test the agent
+-- booking queue against; requested_date must stay >= current_date
+-- (viewing_requests_requested_date_check), so relative offsets are used
+-- rather than fixed dates.
+
+insert into public.viewing_requests (
+  id, customer_id, property_id, agent_id, requested_date, requested_time,
+  status, notes, confirmed_at, completed_at, cancelled_at, cancellation_reason
+) values
+  ('b1000000-0000-0000-0000-000000000001', 'c1000000-0000-0000-0000-000000000001',
+   'a4000000-0000-0000-0000-000000000001', 'a3000000-0000-0000-0000-000000000002',
+   current_date + 3, '10:00', 'pending', 'Looking forward to seeing the kitchen.', null, null, null, null),
+
+  ('b1000000-0000-0000-0000-000000000002', 'c1000000-0000-0000-0000-000000000001',
+   'a4000000-0000-0000-0000-000000000002', 'a3000000-0000-0000-0000-000000000002',
+   current_date + 5, '14:30', 'confirmed', null, now(), null, null, null),
+
+  ('b1000000-0000-0000-0000-000000000003', 'c1000000-0000-0000-0000-000000000002',
+   'a4000000-0000-0000-0000-000000000003', 'a3000000-0000-0000-0000-000000000003',
+   current_date + 1, '09:00', 'completed', null, now(), now(), null, null),
+
+  ('b1000000-0000-0000-0000-000000000004', 'c1000000-0000-0000-0000-000000000002',
+   'a4000000-0000-0000-0000-000000000002', 'a3000000-0000-0000-0000-000000000002',
+   current_date + 7, '11:00', 'cancelled', null, null, null, now(), 'Change of plans.'),
+
+  ('b1000000-0000-0000-0000-000000000005', 'c1000000-0000-0000-0000-000000000001',
+   'a4000000-0000-0000-0000-000000000003', 'a3000000-0000-0000-0000-000000000003',
+   current_date + 2, '16:00', 'no_show', null, now(), null, null, null);

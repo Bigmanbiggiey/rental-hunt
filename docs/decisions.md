@@ -825,6 +825,34 @@ A decision that's easily reversible, purely cosmetic, or has no real alternative
 
 ---
 
+## ADR-029: A transaction-local custom GUC, not RLS or `set_property_verification()`, bypasses `enforce_verification_authority()` for the agent's own submit-for-verification RPC
+
+**Status:** Accepted
+**Date:** 2026-07-29
+
+**Decision:** Sprint 6's `submit_property_for_verification(p_property_id uuid)` RPC (AGENT-007's agent-facing half, `20260729170000_agent_dashboard.sql`) transitions an agent's own `unverified`/`rejected` listing to `pending_verification`. It is `security definer`, but that alone does not bypass the Sprint-3 trigger `enforce_verification_authority()`, whose only original guard was `auth.role() = 'service_role'` — `auth.role()` reads a JWT-claim session GUC, not the actual executing Postgres role, so a `security definer` function invoked by an authenticated agent still evaluates `auth.role() = 'authenticated'` inside it. The RPC calls `perform set_config('app.bypass_verification_authority', 'true', true)` (transaction-local, third argument `true` = auto-resetting) immediately before its own `UPDATE`; the trigger's guard is widened (`create or replace function`) to also accept this GUC.
+
+**Context:** Three alternatives were considered and rejected:
+1. **Disable the trigger for the transaction** (`alter table ... disable trigger`) — takes an `ACCESS EXCLUSIVE` lock, blocking every other reader/writer of `properties` for the duration; unacceptable on a hot, frequently-read table.
+2. **Widen `set_property_verification()` to also accept an agent-submission call** — that RPC doesn't exist yet (Sprint 7 scope), and conflating "agent submits for review" with "moderator/admin decides the outcome" into one function would blur two genuinely different authority levels the Policy Summary (`database.md` §9) already treats as distinct.
+3. **Let RLS handle it instead of a trigger** — RLS is row-level, not column-level; it cannot express "this role may update every column on this row except these three," which is exactly what the trigger's job is (`database.md` §9's existing "verification is not exposed as a raw column update" note).
+
+The GUC-bypass mechanism is the narrowest of the options that don't require new schema: it's set only inside this one RPC's own transaction, unsettable by any ordinary client call through PostgREST (no route exposes raw `set_config`), and auto-resets at transaction end — so a bug elsewhere can't accidentally leave verification-column protection disabled.
+
+**Rationale:** Matches the project's own established convention (`database.md` §9) for any future trigger whose bypass condition needs to distinguish "a specific, narrow, already-authorized RPC call" from "an ordinary client `UPDATE`," where `auth.role()` alone can't make that distinction because it reflects the JWT claim, not the actual code path.
+
+**Consequences:** `enforce_verification_authority()`'s guard clause now has two disjuncts instead of one; any future RPC needing the same kind of narrow bypass should follow this same pattern (a dedicated, function-scoped `app.*` GUC) rather than inventing a new mechanism per case.
+
+**A related, separately-caught bug (not itself the subject of this ADR, but discovered while building the RPC above):** the RPC's own permission guard originally used `<>` comparisons (`public.current_role() <> 'agent'`), which fail open under a `NULL` — `current_role()`/`current_agency_id()` both return `NULL` outside a real auth context, and `NULL <> 'agent'` is `NULL`, which plpgsql's `if` treats as `false`. Caught by testing the function directly against a raw session with no JWT context, not assumed correct from a clean migration apply. Fixed with `is distinct from` throughout (`database.md` §9 documents the general rule this establishes).
+
+**Trade-offs:** A GUC-based bypass is one more mechanism in the RLS/trigger toolkit beyond `security definer` and role checks — a reader unfamiliar with this pattern needs the comment trail (`database.md` §9, the migration file itself) to understand why `auth.role() = 'service_role'` alone wasn't sufficient. Judged worth it given the `ACCESS EXCLUSIVE`-lock and authority-blurring costs of the two rejected alternatives.
+
+**When To Revisit:** If Sprint 7's `set_property_verification()` build reveals the two RPCs should share more logic than currently duplicated (both are single-purpose, narrow, and touch disjoint columns, so no duplication exists yet) — or if a third case needing this same bypass pattern appears, at which point extracting a small shared helper (a function that sets the GUC, matching the "third duplicate" convention already applied elsewhere in this project) would be worth proposing.
+
+**Related Documents:** `database.md` §9 (full mechanism writeup, the `is distinct from` rule), `api-design.md` §6.10 (endpoint contract), `frontend/src/entities/property/property.repository.ts` (`submitForVerification`), `supabase/migrations/20260729170000_agent_dashboard.sql`.
+
+---
+
 # Future ADR Process
 
 | Aspect | Rule |
