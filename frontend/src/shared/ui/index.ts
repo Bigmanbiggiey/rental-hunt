@@ -15,3 +15,5 @@ export * from './avatar';
 export * from './switch';
 export * from './textarea';
 export * from './dialog';
+export * from './table';
+export * from './dropdown-menu';
