@@ -5,7 +5,7 @@ import type { RouteObject } from 'react-router';
 // below (Rollup can't split a module into its own chunk if something else
 // still imports it statically through the barrel).
 import { PlaceholderPage } from '@/pages/PlaceholderPage';
-import { AgentDashboardLayoutRoute, AppLayout, type NavLink } from '@/widgets';
+import { AdminDashboardLayout, AgentDashboardLayoutRoute, AppLayout, type NavLink } from '@/widgets';
 import { ProtectedRoute } from '@/features/authentication';
 import { PATHS } from '@/shared/config';
 
@@ -58,6 +58,24 @@ const AgentBookingsPage = lazy(() =>
 const AgentAnalyticsPage = lazy(() =>
   import('@/pages/AgentAnalyticsPage').then((m) => ({ default: m.AgentAnalyticsPage })),
 );
+const AdminOverviewPage = lazy(() =>
+  import('@/pages/AdminOverviewPage').then((m) => ({ default: m.AdminOverviewPage })),
+);
+const AdminVerificationQueuePage = lazy(() =>
+  import('@/pages/AdminVerificationQueuePage').then((m) => ({ default: m.AdminVerificationQueuePage })),
+);
+const AdminUsersPage = lazy(() =>
+  import('@/pages/AdminUsersPage').then((m) => ({ default: m.AdminUsersPage })),
+);
+const AdminAgenciesPage = lazy(() =>
+  import('@/pages/AdminAgenciesPage').then((m) => ({ default: m.AdminAgenciesPage })),
+);
+const AdminAnalyticsPage = lazy(() =>
+  import('@/pages/AdminAnalyticsPage').then((m) => ({ default: m.AdminAnalyticsPage })),
+);
+const AdminActivityLogPage = lazy(() =>
+  import('@/pages/AdminActivityLogPage').then((m) => ({ default: m.AdminActivityLogPage })),
+);
 
 const PRIMARY_NAV_LINKS: NavLink[] = [{ label: 'Browse Properties', to: PATHS.public.properties }];
 
@@ -83,16 +101,33 @@ export const routeConfig: RouteObject[] = [
         ],
       },
       {
-        // Admin only — roadmap.md §6's acceptance test is specifically
-        // "navigating to /admin as a Customer is blocked"; moderator access
-        // to any of these isn't decided yet, so it isn't included here.
-        element: <ProtectedRoute allowedRoles={['admin']} />,
+        // Moderator + Admin (Sprint 7, roadmap.md §11) — a single shared
+        // `/admin` shell rather than two separate route groups; per-page/
+        // per-nav-link role filtering happens inside `AdminDashboardLayout`
+        // and `AdminOverviewPage` instead. `ProtectedRoute`'s own documented
+        // philosophy already treats this route guard as client-side UX,
+        // never the real security boundary (RLS is) — the same reasoning
+        // that justifies not duplicating a second route group here.
+        element: <ProtectedRoute allowedRoles={['moderator', 'admin']} />,
         children: [
-          { path: PATHS.admin.root, element: <PlaceholderPage title="Admin" /> },
-          { path: PATHS.admin.properties, element: <PlaceholderPage title="Admin — Properties" /> },
-          { path: PATHS.admin.bookings, element: <PlaceholderPage title="Admin — Bookings" /> },
-          { path: PATHS.admin.users, element: <PlaceholderPage title="Admin — Users" /> },
-          { path: PATHS.admin.agencies, element: <PlaceholderPage title="Admin — Agencies" /> },
+          {
+            element: <AdminDashboardLayout />,
+            children: [
+              { path: PATHS.admin.root, element: <AdminOverviewPage /> },
+              { path: PATHS.admin.verificationQueue, element: <AdminVerificationQueuePage /> },
+              { path: PATHS.admin.activityLogs, element: <AdminActivityLogPage /> },
+              // Admin-only pages below still sit inside the shared
+              // allowedRoles gate above — a moderator hitting these URLs
+              // directly is a client-side UX gap only, since RLS blocks the
+              // actual reads/writes regardless (`agencies_select_all_agent_moderator_admin`/
+              // `agencies_insert_admin` etc., database.md §9).
+              { path: PATHS.admin.users, element: <AdminUsersPage /> },
+              { path: PATHS.admin.agencies, element: <AdminAgenciesPage /> },
+              { path: PATHS.admin.analytics, element: <AdminAnalyticsPage /> },
+              { path: PATHS.admin.properties, element: <PlaceholderPage title="Admin — Properties" /> },
+              { path: PATHS.admin.bookings, element: <PlaceholderPage title="Admin — Bookings" /> },
+            ],
+          },
         ],
       },
       {

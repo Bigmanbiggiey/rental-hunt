@@ -35,5 +35,15 @@ export const PATHS = {
     bookings: '/admin/bookings',
     users: '/admin/users',
     agencies: '/admin/agencies',
+    // Sprint 7 — roadmap.md §11. /admin/properties and /admin/bookings stay
+    // PlaceholderPage stubs: neither has an unambiguous Sprint 7 DoD
+    // dependency (verification is fully covered by verificationQueue below;
+    // admin viewing-request oversight is already reachable through
+    // viewingRequestRepository's own Moderator/Admin RLS permissions without
+    // a dedicated screen) — building either now would be scope creep beyond
+    // what the DoD actually names.
+    verificationQueue: '/admin/verification-queue',
+    analytics: '/admin/analytics',
+    activityLogs: '/admin/activity-logs',
   },
 } as const;

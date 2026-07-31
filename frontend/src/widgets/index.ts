@@ -1,5 +1,6 @@
 export * from './layout';
 export * from './agent-dashboard-layout';
+export * from './admin-dashboard-layout';
 export * from './search-hero';
 export * from './featured-listings';
 export * from './property-grid';

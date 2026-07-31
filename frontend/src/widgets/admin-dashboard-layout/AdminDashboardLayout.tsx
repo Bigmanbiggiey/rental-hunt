@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { Menu } from 'lucide-react';
 import { Link, NavLink as RouterNavLink, Outlet, useLocation } from 'react-router';
 import { toast } from 'sonner';
@@ -20,15 +20,24 @@ import {
   SheetTrigger,
 } from '@/shared/ui';
 import { cn } from '@/shared/lib/utils';
-import { useAuth } from '@/entities/user';
+import { useAuth, type UserRole } from '@/entities/user';
 import { useLogout } from '@/features/authentication';
 import { PATHS } from '@/shared/config';
 
-const NAV_LINKS = [
-  { label: 'Overview', to: PATHS.authenticated.dashboard },
-  { label: 'Properties', to: PATHS.authenticated.agentProperties },
-  { label: 'Bookings', to: PATHS.authenticated.agentBookings },
-  { label: 'Analytics', to: PATHS.authenticated.agentAnalytics },
+interface AdminNavLink {
+  label: string;
+  to: string;
+  /** Omitted = visible to every role this layout is mounted for (moderator + admin). */
+  roles?: UserRole[];
+}
+
+const NAV_LINKS: AdminNavLink[] = [
+  { label: 'Overview', to: PATHS.admin.root },
+  { label: 'Verification Queue', to: PATHS.admin.verificationQueue },
+  { label: 'Users', to: PATHS.admin.users, roles: ['admin'] },
+  { label: 'Agencies', to: PATHS.admin.agencies, roles: ['admin'] },
+  { label: 'Analytics', to: PATHS.admin.analytics, roles: ['admin'] },
+  { label: 'Activity Log', to: PATHS.admin.activityLogs },
 ];
 
 function initials(fullName: string): string {
@@ -40,14 +49,16 @@ function initials(fullName: string): string {
     .join('');
 }
 
-function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
+function SidebarNav({ role, onNavigate }: { role: UserRole; onNavigate?: () => void }) {
+  const links = NAV_LINKS.filter((link) => !link.roles || link.roles.includes(role));
+
   return (
-    <nav aria-label="Agent dashboard" className="flex flex-col gap-1">
-      {NAV_LINKS.map((link) => (
+    <nav aria-label="Admin dashboard" className="flex flex-col gap-1">
+      {links.map((link) => (
         <RouterNavLink
           key={link.to}
           to={link.to}
-          end={link.to === PATHS.authenticated.dashboard}
+          end={link.to === PATHS.admin.root}
           onClick={onNavigate}
           className={({ isActive }) =>
             cn(
@@ -65,10 +76,6 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-// ui-guidelines.md §13.9: a Dropdown Menu triggered by the Avatar, showing
-// name, a link to Profile, and Logout. No separate "Notification
-// Preferences" link — that form lives on ProfilePage itself, there's no
-// dedicated route for it.
 function UserMenu() {
   const { profile } = useAuth();
   const { mutate: logout, isPending } = useLogout();
@@ -104,26 +111,26 @@ function UserMenu() {
 }
 
 /**
- * ui-guidelines.md §7.4/§13.7/§13.8. A self-contained shell (own top nav +
- * sidebar), not `AppLayout` + a bolted-on sidebar — the public `Header`'s
- * shape (Browse Properties link, guest Login/Register) doesn't match
- * §13.8's dashboard top-nav spec (logo, page context, User Menu only).
- * Sidebar is 256px (`w-64`, §7.3) on >= lg; on < lg it collapses into a
- * Sheet drawer triggered by the hamburger (§7.3's off-canvas spec), mirroring
- * `widgets/layout/Header.tsx` + `MobileNavDrawer.tsx`'s existing pattern.
- *
- * Takes `children` rather than always rendering its own `<Outlet/>` — the
- * Sprint 6 plan (Gap 3) keeps `/dashboard` itself inside the *generic*
- * authenticated route group (not this widget's own agent-only route group),
- * branching role at the `DashboardPage` component level. So
- * `AgentDashboardOverviewPage` self-wraps with this shell directly
- * (passing its own content as `children`), while the four sibling pages
- * reached through the dedicated agent-only route group get the shell from
- * `AgentDashboardLayoutRoute` below instead — never both at once.
+ * ui-guidelines.md §7.4/§13.7/§13.8 — mirrors `AgentDashboardLayout`'s shell
+ * exactly (256px sidebar >= lg, Sheet drawer < lg, sticky header, User Menu).
+ * Unlike that widget, this one only ever renders its own `<Outlet/>` — `/admin`
+ * has no shared-URL constraint forcing a `children`-vs-`Outlet` duality (Sprint
+ * 6's Gap 3 was specific to `/dashboard` doubling as the generic authenticated
+ * landing page; nothing requires `/admin` to do the same), so a single
+ * `ProtectedRoute allowedRoles={['moderator','admin']}` + this route-layout
+ * element wraps every `/admin/*` page, including the root overview.
+ * Nav links are filtered by `profile.role` — a moderator only sees
+ * Verification Queue + Activity Log, matching roadmap.md §11's DoD split
+ * ("a moderator can review a pending listing" vs. "an admin can deactivate a
+ * user, create a new agency"); this is client-side UX only, the real
+ * enforcement is RLS (`ProtectedRoute`'s own documented philosophy).
  */
-export function AgentDashboardLayout({ children }: { children: ReactNode }) {
+export function AdminDashboardLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const { profile } = useAuth();
   const location = useLocation();
+
+  if (!profile) return null;
 
   return (
     <div className="flex min-h-full flex-col">
@@ -141,12 +148,12 @@ export function AgentDashboardLayout({ children }: { children: ReactNode }) {
                   <SheetTitle>Rental Hunt KE</SheetTitle>
                 </SheetHeader>
                 <div className="mt-6">
-                  <SidebarNav onNavigate={() => setDrawerOpen(false)} />
+                  <SidebarNav role={profile.role} onNavigate={() => setDrawerOpen(false)} />
                 </div>
               </SheetContent>
             </Sheet>
             <Link
-              to={PATHS.authenticated.dashboard}
+              to={PATHS.admin.root}
               className="text-h4 text-foreground focus-visible:ring-ring rounded-md font-semibold focus-visible:ring-2 focus-visible:outline-none"
             >
               Rental Hunt KE
@@ -159,21 +166,14 @@ export function AgentDashboardLayout({ children }: { children: ReactNode }) {
 
       <div className="flex flex-1">
         <aside className="border-border hidden w-64 shrink-0 border-r p-4 lg:block">
-          <SidebarNav />
+          <SidebarNav role={profile.role} />
         </aside>
         <main className="flex-1 p-4 sm:p-6 lg:p-8">
-          <RouteErrorBoundary key={location.pathname}>{children}</RouteErrorBoundary>
+          <RouteErrorBoundary key={location.pathname}>
+            <Outlet />
+          </RouteErrorBoundary>
         </main>
       </div>
     </div>
-  );
-}
-
-/** The route-layout variant, used by `routes.tsx` for the four agent-only `/dashboard/*` paths — supplies `<Outlet/>` as `AgentDashboardLayout`'s children. */
-export function AgentDashboardLayoutRoute() {
-  return (
-    <AgentDashboardLayout>
-      <Outlet />
-    </AgentDashboardLayout>
   );
 }

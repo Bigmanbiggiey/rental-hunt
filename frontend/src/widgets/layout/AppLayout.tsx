@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { Loader2 } from 'lucide-react';
-import { Outlet } from 'react-router';
+import { Outlet, useLocation } from 'react-router';
+import { RouteErrorBoundary } from '@/shared/ui';
 import { Footer } from './Footer';
 import { Header } from './Header';
 import type { NavLink } from './navLink.types';
@@ -26,13 +27,17 @@ function RouteLoadingFallback() {
 }
 
 function AppLayout({ homeHref, primaryLinks }: AppLayoutProps) {
+  const location = useLocation();
+
   return (
     <div className="flex min-h-full flex-col">
       <Header homeHref={homeHref} primaryLinks={primaryLinks} />
       <main className="flex-1">
-        <Suspense fallback={<RouteLoadingFallback />}>
-          <Outlet />
-        </Suspense>
+        <RouteErrorBoundary key={location.pathname}>
+          <Suspense fallback={<RouteLoadingFallback />}>
+            <Outlet />
+          </Suspense>
+        </RouteErrorBoundary>
       </main>
       <Footer />
     </div>
