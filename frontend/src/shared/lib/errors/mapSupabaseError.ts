@@ -1,4 +1,5 @@
 import { StorageApiError } from '@supabase/supabase-js';
+import { logger } from '@/shared/lib/logger';
 import { AppError, type ErrorCode } from './appError';
 
 interface AuthErrorLike {
@@ -61,6 +62,7 @@ const POSTGREST_ERROR_CODE_MAP: Partial<Record<string, ErrorCode>> = {
   PGRST116: 'FORBIDDEN', // 0 or >1 rows for .single() — most often an RLS-filtered miss
   RH001: 'PROPERTY_NOT_AVAILABLE', // prevent_booking_unavailable_property() trigger (database.md §9) — a dedicated errcode so this specific rejection doesn't fall through to the generic DATABASE_ERROR default.
   RH002: 'INVALID_STATE_TRANSITION', // submit_property_for_verification() RPC (database.md §9, Sprint 6) — wrong-source-status case; reuses the existing code rather than adding a new one-off.
+  P0002: 'PROPERTY_NOT_FOUND', // set_property_verification() RPC (database.md §9, Sprint 7) — standard PL/pgSQL "no_data_found" SQLSTATE, not a custom RH00N (Sprint 7 plan's Open Questions: the "reason required when rejecting" case already fits the existing 23514 -> VALIDATION_ERROR mapping, so no new custom code was needed there; this one genuinely has no existing signal to reuse).
 };
 
 export interface MapSupabaseErrorOptions {
@@ -86,6 +88,16 @@ export function mapSupabaseError(error: unknown, options: MapSupabaseErrorOption
       return new AppError(options.notFoundCode, 'This item could not be found.');
     }
     const code = POSTGREST_ERROR_CODE_MAP[error.code] ?? 'DATABASE_ERROR';
+    // coding-standards.md §22's "Error reporting" row — only the genuinely
+    // unexpected fallthrough is worth a monitoring hook point; VALIDATION_ERROR/
+    // FORBIDDEN/a resource-specific NOT_FOUND are normal application flow,
+    // not bugs to surface. No PII in `meta` — a Postgres errcode, never the
+    // row's own data.
+    if (code === 'DATABASE_ERROR') {
+      logger.error('mapSupabaseError: unrecognized Postgres/PostgREST error code', {
+        postgresCode: error.code,
+      });
+    }
     return new AppError(code, friendlyMessage(code), null);
   }
 
@@ -95,6 +107,9 @@ export function mapSupabaseError(error: unknown, options: MapSupabaseErrorOption
     return new AppError(code, friendlyMessage(code), null);
   }
 
+  logger.error('mapSupabaseError: unrecognized error shape', {
+    errorType: error === null ? 'null' : typeof error,
+  });
   return new AppError('UNEXPECTED_ERROR', friendlyMessage('UNEXPECTED_ERROR'), null);
 }
 

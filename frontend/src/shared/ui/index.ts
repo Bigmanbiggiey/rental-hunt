@@ -17,3 +17,4 @@ export * from './textarea';
 export * from './dialog';
 export * from './table';
 export * from './dropdown-menu';
+export * from './route-error-boundary';

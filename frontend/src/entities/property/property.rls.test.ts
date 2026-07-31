@@ -23,13 +23,37 @@ const VISIBLE_SLUG = '2br-apartment-kilimani-a1';
 
 const guest = createClient(SUPABASE_URL, ANON_KEY, { auth: { persistSession: false } });
 
+const SEEDED_VISIBLE_SLUGS = [
+  '2br-apartment-kilimani-a1',
+  '3br-apartment-westlands-a2',
+  'family-villa-karen-a3',
+  'townhouse-lavington-a4',
+  'maisonette-embakasi-a5',
+  'studio-kileleshwa-a6',
+  'bedsitter-south-b-a7',
+];
+
 describe('properties/property_images/property_amenities/agent_directory RLS (integration, local Supabase)', () => {
-  it('a guest sees exactly the 7 seeded properties that are non-archived, non-deleted, and not rejected', async () => {
+  it('a guest sees at least the 7 seeded properties that are non-archived, non-deleted, and not rejected', async () => {
     const { data, error } = await guest.from('properties').select('slug');
     expect(error).toBeNull();
-    expect(data).toHaveLength(7);
-    expect(data?.map((p) => p.slug)).not.toContain(REJECTED_SLUG);
-    expect(data?.map((p) => p.slug)).not.toContain(ARCHIVED_SLUG);
+    // >= not ===: pinning an exact global count on a shared,
+    // concurrently-writable table is inherently fragile once other test
+    // files start transitioning fixtures to a guest-visible status mid-run
+    // (Sprint 7's `verification.rls.test.ts` does exactly this to prove
+    // `set_property_verification()` approvals) — the same fragility
+    // `PropertiesPage.test.tsx`'s own pagination assertion was hardened
+    // against in Sprint 6 (`toBe(22)` -> `toBeGreaterThanOrEqual(22)`).
+    // What this test actually needs to prove — every one of the 7 known
+    // seed slugs is present, and the excluded ones never are — doesn't
+    // require an exact total.
+    const slugs = data?.map((p) => p.slug) ?? [];
+    expect(slugs.length).toBeGreaterThanOrEqual(7);
+    for (const slug of SEEDED_VISIBLE_SLUGS) {
+      expect(slugs).toContain(slug);
+    }
+    expect(slugs).not.toContain(REJECTED_SLUG);
+    expect(slugs).not.toContain(ARCHIVED_SLUG);
   });
 
   it('a guest cannot read the rejected fixture property directly by slug', async () => {

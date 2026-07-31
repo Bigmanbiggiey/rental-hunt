@@ -43,6 +43,15 @@ export interface PropertyRepository {
   incrementViewCount(id: string): Promise<void>;
   /** AGENT-007's agent-facing half — wraps the `submit_property_for_verification` RPC (database.md §9, Gap 2); the RPC itself enforces own-agency + unverified/rejected-only. */
   submitForVerification(id: string): Promise<Property>;
+  /**
+   * Sprint 7 — the moderator/admin verification queue and `entities/property-verification`'s
+   * `history()` both need to read *any* property by id, not just "my own
+   * agency's" (`getById`'s deliberate scope). A thin public export of the
+   * same unscoped `fetchById()` every write method below already relies on
+   * — RLS's `properties_select_all_moderator_admin` policy (database.md §9)
+   * is the real authority here, not a client-side filter.
+   */
+  getByIdAdmin(id: string): Promise<Property>;
 }
 
 // api-design.md §6.1's underlying-call shape — one query, no N+1 client-side
@@ -403,6 +412,10 @@ export const propertyRepository: PropertyRepository = {
   async submitForVerification(id) {
     const { error } = await supabase.rpc('submit_property_for_verification', { p_property_id: id });
     if (error) throw mapSupabaseError(error, { notFoundCode: 'PROPERTY_NOT_FOUND' });
+    return fetchById(id);
+  },
+
+  async getByIdAdmin(id) {
     return fetchById(id);
   },
 };
