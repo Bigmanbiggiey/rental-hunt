@@ -196,6 +196,36 @@ insert into auth.users (
 update public.profiles set phone = '+254711000001' where id = 'c1000000-0000-0000-0000-000000000001';
 update public.profiles set phone = '+254711000002' where id = 'c1000000-0000-0000-0000-000000000002';
 
+-- ── Moderator/Admin identities (Sprint 7) ────────────────────────────────────
+-- Needed for the mandatory manual real-browser walkthrough of the admin
+-- dashboard (moderator reviewing a pending listing, admin deactivating a
+-- user/creating an agency) — same disable-trigger/promote-role/re-enable
+-- pattern already used for the 4 seeded agents above. No automated RLS test
+-- depends on these rows; signUpActor(name, role) in rlsTestHelpers.ts
+-- creates its own moderator/admin fixtures independently.
+
+insert into auth.users (
+  instance_id, id, aud, role, email, encrypted_password,
+  email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
+  created_at, updated_at,
+  confirmation_token, recovery_token, email_change_token_new, email_change
+) values
+  ('00000000-0000-0000-0000-000000000000', 'd1000000-0000-0000-0000-000000000001', 'authenticated', 'authenticated',
+   'moderator1.seed@rentalhunt.test', extensions.crypt('seed-password-not-real', extensions.gen_salt('bf')),
+   now(), '{"provider":"email","providers":["email"]}', '{"full_name":"Njoki Kamotho"}', now(), now(),
+   '', '', '', ''),
+  ('00000000-0000-0000-0000-000000000000', 'd1000000-0000-0000-0000-000000000002', 'authenticated', 'authenticated',
+   'admin1.seed@rentalhunt.test', extensions.crypt('seed-password-not-real', extensions.gen_salt('bf')),
+   now(), '{"provider":"email","providers":["email"]}', '{"full_name":"Samuel Mutiso"}', now(), now(),
+   '', '', '', '');
+
+alter table public.profiles disable trigger prevent_self_role_change_trigger;
+
+update public.profiles set role = 'moderator' where id = 'd1000000-0000-0000-0000-000000000001';
+update public.profiles set role = 'admin' where id = 'd1000000-0000-0000-0000-000000000002';
+
+alter table public.profiles enable trigger prevent_self_role_change_trigger;
+
 -- ── Viewing requests ─────────────────────────────────────────────────────────
 -- Sprint 6 (BOOK-*) needs at least one row per status to test the agent
 -- booking queue against; requested_date must stay >= current_date
