@@ -14,6 +14,7 @@ export * from './hooks/usePropertyImages';
 export * from './hooks/useUploadPropertyImage';
 export * from './hooks/useDeletePropertyImage';
 export * from './hooks/useReorderPropertyImages';
+export * from './hooks/useAgentPropertyVerificationRealtime';
 export * from './components/PropertyForm';
 export * from './components/AgentPropertyTable';
 export * from './components/PropertyFilters';

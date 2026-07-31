@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router';
@@ -7,6 +7,19 @@ import { supabase } from '@/shared/lib/supabase';
 import { serviceClient } from '@/shared/lib/testing/rlsTestHelpers';
 import { PATHS } from '@/shared/config';
 import { AgentPropertyFormPage } from './AgentPropertyFormPage';
+
+// Sprint 7: this page now mounts `useAgentPropertyVerificationRealtime()`,
+// which opens a real `postgres_changes` WebSocket subscription. Stubbed out
+// here (not exercised — no test in this file needs a live status change)
+// because a real subscription's connection handshake can complete after
+// jsdom's environment tears down, surfacing as an unrelated-looking
+// uncaught `WebSocket.dispatchEvent` exception — an undici/jsdom
+// compatibility quirk, the same class of "genuine environment limitation,
+// not a real app bug" Sprint 6 already hit and worked around for
+// `AgentBookingQueue.test.tsx`'s Radix focus-scope issue.
+vi.mock('@/features/agent-properties/hooks/useAgentPropertyVerificationRealtime', () => ({
+  useAgentPropertyVerificationRealtime: () => {},
+}));
 
 /**
  * Real integration test against the local Supabase stack — mirrors

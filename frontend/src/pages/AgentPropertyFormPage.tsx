@@ -4,6 +4,7 @@ import {
   PropertyForm,
   VerificationStatusPanel,
   useAgentProperty,
+  useAgentPropertyVerificationRealtime,
 } from '@/features/agent-properties';
 import { Alert, AlertDescription, Skeleton } from '@/shared/ui';
 import { PATHS } from '@/shared/config';
@@ -14,6 +15,7 @@ function AgentPropertyFormPage() {
   const { id } = useParams<{ id?: string }>();
   const navigate = useNavigate();
   const isEditMode = !!id;
+  useAgentPropertyVerificationRealtime();
   const { data: property, isLoading, isError } = useAgentProperty(id);
 
   if (isEditMode && isLoading) {

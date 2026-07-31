@@ -5,6 +5,7 @@ import {
   AgentPropertyTable,
   PropertyFilters,
   useAgentProperties,
+  useAgentPropertyVerificationRealtime,
 } from '@/features/agent-properties';
 import type { AgentPropertyFilters } from '@/entities/property';
 import { Alert, AlertDescription, Button, EmptyState, Skeleton } from '@/shared/ui';
@@ -18,6 +19,7 @@ function AgentPropertiesPage() {
   const [filters, setFilters] = useState<AgentPropertyFilters>({});
   const [page, setPage] = useState(1);
 
+  useAgentPropertyVerificationRealtime();
   const { data, isLoading, isError } = useAgentProperties(filters, page, PAGE_SIZE);
 
   return (
