@@ -853,6 +853,32 @@ The GUC-bypass mechanism is the narrowest of the options that don't require new 
 
 ---
 
+## ADR-030: Sprint 7 admin repositories placed per the ADR-026/028 "2+ real consumers" test, applied to five new data-access surfaces at once
+
+**Status:** Accepted
+**Date:** 2026-07-31
+
+**Decision:** Sprint 7 (Administration, `roadmap.md` §11) needed five new Repository-layer data-access surfaces. Each was placed in `entities/` or a single `features/*/repositories/` folder by applying ADR-026/028's existing test literally — "does anything outside one specific feature actually need this?" — rather than defaulting every admin-facing repository into one new `entities/admin/` or a monolithic `adminRepository`:
+
+| Repository | Placement | Why |
+|---|---|---|
+| `agencyRepository` | `entities/agency/` (new slice) | `AGENCY_NOT_FOUND` already existed in the `ErrorCode` union, unused — a real signal this was always meant to be a first-class entity, not admin-only. `Agency` also appears in `api-design.md` §3.1's canonical types, referenced from `Agent`/other future consumers, not just the admin agency-management screen. |
+| `verificationRepository` | `entities/property-verification/` (new slice) | Genuinely cross-cutting from day one: the agent's own `VerificationStatusPanel` reads `history()` (RLS-scoped to their own agency) in the same release that the moderator/admin review screen reads `listPending()`/`setStatus()`/`history()` — two real, independent consumer sides, not a hypothetical future one. |
+| `adminUserRepository` | `features/admin-users/repositories/` | Only the admin user-management screen needs `list()`/`adminUpdate()`. `entities/user/profile.repository.ts`'s existing `getById`/`update` stay scoped to "a user manages their own row" (`CUST-003`) — extending it with admin-only methods would blur two genuinely different authority levels onto one interface, the same reasoning ADR-029 already applied to keep `set_property_verification()`/`submit_property_for_verification()` as two separate RPCs rather than one. |
+| `adminMetricsRepository` | `features/admin-dashboard/repositories/` | Mirrors `agentDashboardRepository`'s own Sprint 6 placement exactly — a single dashboard-summary shape with no second consumer anywhere in the roadmap. |
+| `adminAnalyticsRepository` | `features/admin-analytics/repositories/` | Mirrors `agentAnalyticsRepository`'s own Sprint 6 placement exactly, at the platform level instead of one agency's. |
+| `activityLogRepository` | `features/admin-activity-log/repositories/` | Single owner — no other screen reads or writes `activity_logs` directly (every other write path is a DB trigger or the verification RPC, never a client Repository call). |
+
+**Context:** The alternative — one `adminRepository` covering all of §9's Admin API rows, as `api-design.md`'s original sketch implied — was rejected. It would have forced every admin data shape through one file regardless of whether it's genuinely cross-cutting (`agencyRepository`, `verificationRepository`) or single-screen (`adminMetricsRepository`, `adminAnalyticsRepository`, `activityLogRepository`, `adminUserRepository`), the exact anti-pattern ADR-026/028 already rejected once for `entities/viewing-request` vs. `features/favorites`.
+
+**Rationale:** A consistent, already-proven test applied mechanically to five decisions at once, rather than re-litigating the entities-vs-features question five separate times. `api-design.md` §9/§13 updated in the same change to describe the real split rather than the originally-sketched single repository.
+
+**Consequences:** A future session adding a genuine second consumer to `adminMetricsRepository`/`adminAnalyticsRepository`/`activityLogRepository`/`adminUserRepository` should move it to `entities/` at that point, not before — the same "don't build for a hypothetical future consumer" discipline `coding-standards.md` §2 already states generally.
+
+**Related Documents:** `api-design.md` §9/§13, `database.md` §9's Policy Summary (`agencies`/`activity_logs`/`property_verifications` rows), ADR-026, ADR-028, ADR-029.
+
+---
+
 # Future ADR Process
 
 | Aspect | Rule |

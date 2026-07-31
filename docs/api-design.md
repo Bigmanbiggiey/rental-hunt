@@ -251,6 +251,19 @@ interface PropertyVerification {
   reason: string | null;
   createdAt: ISODateTime;
 }
+
+// Sprint 7, database.md §5.14/§11. actorName is a Sprint 7 frontend-side
+// convenience (an embedded `profiles(full_name)` join), not a raw DB column.
+interface ActivityLog {
+  id: UUID;
+  actorId: UUID | null;
+  actorName: string | null;
+  action: string; // e.g. 'property.created', 'viewing.status_changed' — database.md §11's Tracked Events table
+  entityType: string;
+  entityId: UUID | null;
+  metadata: Record<string, unknown>;
+  createdAt: ISODateTime;
+}
 ```
 
 ---
@@ -731,16 +744,18 @@ stateDiagram-v2
 
 All routes below require `moderator` or `admin` (verification/viewing oversight) or `admin` alone (user/agency management), per the RLS matrix in `database.md` §9.
 
+**Implementation status (Sprint 7, `roadmap.md` §11):** Dashboard Metrics, Manage Users, Manage Agencies, Verification Queue, Verification Action, and Activity Logs are all built and reachable through real UI (`/admin`, `/admin/verification-queue`, `/admin/users`, `/admin/agencies`, `/admin/analytics`, `/admin/activity-logs`). **Manage Properties remains a `PlaceholderPage` stub, deliberately not built** — no Sprint 7 DoD line names a dedicated admin property-management screen; verification is fully covered by the Verification Queue, and `propertyRepository` already gives admin full CRUD via RLS (`database.md` §9's `properties_update_admin`) for any future session that adds the screen. `Repository Function` below reflects the real, split implementation rather than one monolithic `adminRepository` this section originally sketched — each repository lives in the `entities/`/`features/` slice ADR-026/028/030's "2+ real consumers" test actually puts it in.
+
 | Operation | Method / Route | Repository Function | Permissions | Notes |
 |---|---|---|---|---|
-| Dashboard Metrics | `GET /admin/metrics` | `adminRepository.getMetrics()` | Admin | Platform-wide counts: total properties, pending verifications, active agencies, bookings this week. |
-| Manage Properties | `GET /admin/properties`, `PATCH /admin/properties/:id` | `propertyRepository.list({ scope: 'all' })`, `.update()` | Admin | Bypasses the public visibility filter (§4); can force-archive any listing. |
-| Manage Users | `GET /admin/users`, `PATCH /admin/users/:id` | `profileRepository.list()`, `.adminUpdate(id, { role?, isActive? })` | Admin | The only path that can change `profiles.role` (bypasses the self-role-change trigger, `database.md` §9). |
-| Manage Agencies | `GET /admin/agencies`, `POST /admin/agencies`, `PATCH /admin/agencies/:id` | `agencyRepository.list()`, `.create()`, `.update()` | Admin | Agency onboarding is admin-driven in the MVP (`FUT-002` self-service onboarding is deferred). |
-| Verification Queue | `GET /admin/properties/pending-verification` | `verificationRepository.listPending()` | Moderator, Admin | Filters `properties.verification_status = 'pending_verification'`. |
-| Verification Action | see §6.9 | `verificationRepository.setStatus()` | Moderator, Admin | Same RPC as the Agent Dashboard's verification screen. |
-| Activity Logs | `GET /admin/activity-logs` | `activityLogRepository.list(filters)` | Moderator (read), Admin (read + retention delete) | Filterable by `entityType`, `entityId`, `actorId`, date range. |
-| Analytics | `GET /admin/analytics` | `adminRepository.getAnalytics(range)` | Admin | Aggregates `view_count`, viewing-request volume, and per-agency listing counts over a date range (`AGENT-008` at the platform level). |
+| Dashboard Metrics | `GET /admin/metrics` | `adminMetricsRepository.getMetrics()` (`features/admin-dashboard`) | Admin | Platform-wide counts: total properties, pending verifications, active agencies, bookings in the last 7 days. |
+| Manage Properties | `GET /admin/properties`, `PATCH /admin/properties/:id` | `propertyRepository.list({ scope: 'all' })`, `.update()` | Admin | **Not built (Sprint 7) — deliberately out of scope, see status note above.** Bypasses the public visibility filter (§4); can force-archive any listing, whenever a future sprint adds this screen. |
+| Manage Users | `GET /admin/users`, `PATCH /admin/users/:id` | `adminUserRepository.list()`, `.adminUpdate(id, { role?, isActive? })` (`features/admin-users`) | Admin | The only path that can change `profiles.role` (bypasses the self-role-change trigger, `database.md` §9). Feature-local, not an extension of `profileRepository` — no other consumer needs `list()`/`adminUpdate()` (ADR-030). |
+| Manage Agencies | `GET /admin/agencies`, `POST /admin/agencies`, `PATCH /admin/agencies/:id` | `agencyRepository.list()`, `.getById(id)`, `.create()`, `.update()` (`entities/agency`) | Admin | Agency onboarding is admin-driven in the MVP (`FUT-002` self-service onboarding is deferred). `getById` is a Sprint 7 extension to the §13 contract below — the admin edit form needs to fetch a single agency to prefill, and `list()`'s `Agency[]` shape has no id-scoped variant. No agency-logo upload UI — `logoUrl` is a plain optional text field (the DoD says "create a new agency," not "upload a logo"; `database.md` §10's `agency-logos` bucket remains unbuilt). |
+| Verification Queue | `GET /admin/properties/pending-verification` | `verificationRepository.listPending()` (`entities/property-verification`) | Moderator, Admin | Filters `properties.verification_status = 'pending_verification'`, ordered oldest-first (a fair review queue). |
+| Verification Action | see §6.9 | `verificationRepository.setStatus()` (`entities/property-verification`) | Moderator, Admin | Same RPC as the Agent Dashboard's verification screen. |
+| Activity Logs | `GET /admin/activity-logs` | `activityLogRepository.list(filters)`, `.delete(id)` (`features/admin-activity-log`) | Moderator (read), Admin (read + retention delete) | Filterable by `entityType`, `entityId`, `actorId`, date range. |
+| Analytics | `GET /admin/analytics` | `adminAnalyticsRepository.getAnalytics(range)` (`features/admin-analytics`) | Admin | Aggregates total listing views, viewing-request volume in range, and per-agency listing counts (`AGENT-008` at the platform level) — client-side grouped from plain row lists, mirroring `agentAnalyticsRepository.listPropertyAnalytics()`'s existing shape, not a new SQL aggregation function. |
 
 ---
 
@@ -897,18 +912,39 @@ interface AgentRepository { // Sprint 6, new entities/ slice — resolves "my ow
 
 interface AgencyRepository {
   list(filters?: { county?: string }): Promise<Agency[]>;
+  getById(id: string): Promise<Agency>; // Sprint 7 extension — the admin edit form fetches by id, not slug
   getBySlug(slug: string): Promise<Agency>;
   create(input: CreateAgencyInput): Promise<Agency>; // Admin only
   update(id: string, input: Partial<CreateAgencyInput>): Promise<Agency>; // Admin, or own agency's agent for limited fields
 }
 // Errors: VALIDATION_ERROR, AGENCY_NOT_FOUND, FORBIDDEN
 
-interface VerificationRepository {
+interface VerificationRepository { // Sprint 7, new entities/property-verification/ slice — cross-cutting (the agent's own VerificationStatusPanel reads history(); moderator/admin read all three methods)
   listPending(page?: number, pageSize?: number): Promise<{ data: Property[]; meta: PageMeta }>;
   setStatus(propertyId: string, input: { status: VerificationStatus; reason?: string }): Promise<{ property: Property; verification: PropertyVerification }>;
   history(propertyId: string): Promise<PropertyVerification[]>;
 }
 // Errors: VALIDATION_ERROR, PROPERTY_NOT_FOUND, FORBIDDEN
+
+interface AdminUserRepository { // Sprint 7, features/admin-users — feature-local (ADR-030), not an extension of ProfileRepository
+  list(filters?: { role?: UserRole; isActive?: boolean; q?: string }, page?: number, pageSize?: number): Promise<{ data: Profile[]; meta: PageMeta }>;
+  adminUpdate(id: string, input: { role?: UserRole; isActive?: boolean }): Promise<Profile>; // the only path that can change profiles.role
+}
+// Errors: VALIDATION_ERROR, PROFILE_NOT_FOUND, FORBIDDEN
+
+interface AdminMetricsRepository { // Sprint 7, features/admin-dashboard — feature-local (ADR-030)
+  getMetrics(): Promise<{ totalProperties: number; pendingVerifications: number; activeAgencies: number; bookingsThisWeek: number }>;
+}
+
+interface AdminAnalyticsRepository { // Sprint 7, features/admin-analytics — feature-local (ADR-030)
+  getAnalytics(range: { from: string; to: string }): Promise<{ totalViews: number; viewingRequestsInRange: number; byAgency: { agencyId: string; agencyName: string; listingCount: number }[] }>;
+}
+
+interface ActivityLogRepository { // Sprint 7, features/admin-activity-log — feature-local (ADR-030)
+  list(filters?: { entityType?: string; entityId?: string; actorId?: string; dateFrom?: string; dateTo?: string }, page?: number, pageSize?: number): Promise<{ data: ActivityLog[]; meta: PageMeta }>;
+  delete(id: string): Promise<void>; // Admin only, retention/GDPR purposes
+}
+// Errors (AdminMetricsRepository/AdminAnalyticsRepository/ActivityLogRepository): FORBIDDEN, DATABASE_ERROR
 ```
 
 ---
@@ -1054,6 +1090,10 @@ This mapping table lives in exactly one shared utility (`mapSupabaseError()`), u
 **Mechanism for the `prevent_booking_unavailable_property()` row above (added Sprint 5):** the trigger raises with a dedicated Postgres errcode, `RH001` (`database.md` §9), rather than the default `P0001` — `mapSupabaseError()`'s `POSTGREST_ERROR_CODE_MAP` maps `RH001` directly to `PROPERTY_NOT_AVAILABLE`. This is the general pattern for any trigger whose rejection needs to reach the frontend as a specific typed code: a dedicated errcode, never matching on the raised message text (brittle, locale-fragile).
 
 **`viewingRequestRepository.cancel(id, reason?)`'s not-found case (added Sprint 5):** RLS's `viewing_requests_cancel_own_customer` policy scopes the `UPDATE` to the caller's own rows while `status IN ('pending','confirmed')` — a 0-rows-affected result (PostgREST `PGRST116`) can mean either "not your request" or "already in a terminal state," and RLS deliberately can't distinguish the two (same non-leaking reasoning as `profile.rls.test.ts`'s own-row policies). This normalizes to `INVALID_STATE_TRANSITION`, not `VIEWING_REQUEST_NOT_FOUND` — the Cancel button is only ever shown on a request the customer can already see, so a real hit here is stale client state, not an ownership violation.
+
+**`set_property_verification()`'s not-found case (added Sprint 7):** raises a plain PL/pgSQL `P0002` (`no_data_found`, a standard SQLSTATE) for a nonexistent `property_id` — `mapSupabaseError()` maps `P0002` directly to `PROPERTY_NOT_FOUND`. Considered a new `RH003` custom errcode for the RPC's other failure case ("reason required when rejecting") and deliberately did not add one: that case already raises a standard `23514` (`check_violation`), which already maps to `VALIDATION_ERROR` — the Service-layer Zod schema (`VerificationActionSchema`) catches it first in the normal path regardless, so the DB check is only ever a rare backstop, not a case the frontend needs to distinguish with its own dedicated code the way `RH001`/`RH002` genuinely did.
+
+**Client-side logging (Sprint 7, `coding-standards.md` §22):** this is a frontend-only SPA with no server tier, so "logged server-side with full detail" above means `shared/lib/logger.ts` — the single logging call site every `console.warn`/`console.error` funnels through (enforced by the `no-console` ESLint rule). `mapSupabaseError()` calls `logger.error()` for the genuinely unexpected `DATABASE_ERROR`/`UNEXPECTED_ERROR` fallthrough cases only (never for expected outcomes like `VALIDATION_ERROR`/`FORBIDDEN`/a resource-specific not-found), with a Postgres errcode or error type in `meta` — never PII. `shared/ui/route-error-boundary.tsx`'s `RouteErrorBoundary` (the one sanctioned class-component exception, `coding-standards.md` §7) does the same for render-time errors, wrapping each top-level layout's `<Outlet/>`/`children`. No Sentry-style integration yet — both are the documented drop-in hook point for one later.
 
 ---
 
