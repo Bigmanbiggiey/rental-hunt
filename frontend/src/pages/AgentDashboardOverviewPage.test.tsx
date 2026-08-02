@@ -123,12 +123,21 @@ describe('AgentDashboardOverviewPage (integration, local Supabase)', () => {
     await createTestProperty(agent.agencyId, agent.agentId, `dash-archived-${Date.now()}`, true);
 
     const customer = await signUpActor('dashCustomer');
-    await serviceClient.from('viewing_requests').insert([
+    // `viewing_requests_requested_date_check` (database.md §9) requires
+    // `requested_date >= current_date` — a real "completed" booking reaches
+    // that status via a status *update* after a valid future-dated request,
+    // never by inserting a historical date directly, so both fixture rows
+    // use a relative future date rather than a hardcoded one (a hardcoded
+    // past-tense date here previously rotted into a constraint violation
+    // once "today" caught up to it, silently failing this whole insert and
+    // making the dashboard's real counts look wrong).
+    const futureDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const { error: vrError } = await serviceClient.from('viewing_requests').insert([
       {
         customer_id: customer.userId,
         property_id: activeProperty,
         agent_id: agent.agentId,
-        requested_date: '2026-08-15',
+        requested_date: futureDate,
         requested_time: '14:00',
         status: 'pending',
       },
@@ -136,11 +145,12 @@ describe('AgentDashboardOverviewPage (integration, local Supabase)', () => {
         customer_id: customer.userId,
         property_id: activeProperty,
         agent_id: agent.agentId,
-        requested_date: '2026-08-01',
+        requested_date: futureDate,
         requested_time: '10:00',
         status: 'completed',
       },
     ]);
+    if (vrError) throw vrError;
 
     renderDashboard();
 
