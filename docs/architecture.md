@@ -275,6 +275,18 @@ Nested under `/dashboard` specifically to avoid colliding with the customer's ow
 * /dashboard/bookings
 * /dashboard/analytics
 
+## Admin Routes (role = moderator or admin, Sprint 7)
+
+A single shared `<ProtectedRoute allowedRoles={['moderator','admin']}/>` group, not two separate ones — per-page/per-nav-link role filtering happens inside `AdminDashboardLayout` and `AdminOverviewPage` instead (client-side UX only; RLS is the real boundary, the same philosophy `ProtectedRoute` itself documents). Wrapped by `AdminDashboardLayout` (`widgets/admin-dashboard-layout/`) — deliberately simpler than `AgentDashboardLayout`: a plain `Outlet`-only layout, no `children`-vs-`Outlet` duality, since `/admin` has no shared-URL constraint forcing self-wrapping the way `/dashboard` does for the agent/customer split.
+
+* /admin — `AdminOverviewPage`, branches moderator-vs-admin content at the component level (same "one URL, branch content" pattern as `/dashboard` above)
+* /admin/verification-queue
+* /admin/users (admin only)
+* /admin/agencies (admin only)
+* /admin/analytics (admin only)
+* /admin/activity-logs
+* /admin/properties, /admin/bookings — deliberately `PlaceholderPage` stubs (no Sprint 7 DoD line names a dedicated screen for either; admin already has full RLS-backed access for any future session that adds them)
+
 ---
 
 ## Administrative Routes
