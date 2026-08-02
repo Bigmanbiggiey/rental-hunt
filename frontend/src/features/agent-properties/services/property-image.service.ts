@@ -18,13 +18,32 @@ export function validatePropertyImageFile(file: File): void {
   }
 }
 
+const IMAGE_UPLOAD_RATE_LIMIT = 20;
+const IMAGE_UPLOAD_RATE_WINDOW_SECONDS = 60 * 60;
+
 export const propertyImageService = {
   async listByProperty(propertyId: string) {
     return propertyImageRepository.listByProperty(propertyId);
   },
 
-  async upload(propertyId: string, file: File, altText?: string) {
+  /**
+   * api-design.md §18's Service-layer rate limit ("20 per hour, per agent").
+   * `agentId` is threaded in by the caller (`useUploadPropertyImage`, via
+   * `useCurrentAgent()`) rather than resolved here, mirroring how
+   * `agentPropertyService`'s own methods already take a resolved agent/
+   * agency id instead of re-deriving it per call.
+   */
+  async upload(propertyId: string, file: File, agentId: string, altText?: string) {
     validatePropertyImageFile(file);
+
+    const windowStart = new Date(Date.now() - IMAGE_UPLOAD_RATE_WINDOW_SECONDS * 1000).toISOString();
+    const recentCount = await propertyImageRepository.countRecentByAgent(agentId, windowStart);
+    if (recentCount >= IMAGE_UPLOAD_RATE_LIMIT) {
+      throw new AppError('RATE_LIMITED', 'Too many image uploads. Please try again later.', {
+        retryAfterSeconds: String(IMAGE_UPLOAD_RATE_WINDOW_SECONDS),
+      });
+    }
+
     return propertyImageRepository.upload(propertyId, file, altText);
   },
 

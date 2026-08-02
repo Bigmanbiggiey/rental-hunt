@@ -1172,6 +1172,8 @@ Supabase does not provide general-purpose application-level rate limiting out of
 
 All rate-limit rejections return `RATE_LIMITED` with a `retryAfterSeconds` hint in `error.details` where the enforcement point can supply one.
 
+**Implementation status (Sprint 8, `roadmap.md` §12):** the two Service-layer counters are built and unit-tested — `viewingRequestService.create()` checks `viewingRequestRepository.countRecentByCustomer()` before the availability/validation checks (cheapest reason to reject first), and `propertyImageService.upload()` checks `propertyImageRepository.countRecentByAgent()` after file-type/size validation. Both throw `RATE_LIMITED` with `retryAfterSeconds` set to the window length. Login/Register/Password Reset is covered by Supabase Auth's own built-in throttling (confirmed via `mapSupabaseError.ts`'s `over_request_rate_limit`/`over_email_send_rate_limit` mappings). The two Cloudflare-rule rows (Search, Future Public API) remain infrastructure configuration, out of this repository's scope.
+
 ---
 
 # 19. API Security

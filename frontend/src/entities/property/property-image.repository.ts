@@ -8,6 +8,8 @@ export interface PropertyImageRepository {
   upload(propertyId: string, file: File, altText?: string): Promise<PropertyImage>;
   delete(imageId: string): Promise<void>;
   reorder(propertyId: string, orderedImageIds: string[]): Promise<PropertyImage[]>;
+  /** api-design.md §18 rate limit ("20 per hour, per agent") — `property_images_select_visible_parent` is public, so this can't rely on RLS alone the way viewing-request counting does; scoped via an explicit join on `properties.agent_id`. */
+  countRecentByAgent(agentId: string, sinceIso: string): Promise<number>;
 }
 
 const BUCKET = 'property-images';
@@ -73,6 +75,17 @@ export const propertyImageRepository: PropertyImageRepository = {
     }
 
     return mapPropertyImageRow(data);
+  },
+
+  async countRecentByAgent(agentId, sinceIso) {
+    const { count, error } = await supabase
+      .from('property_images')
+      .select('id, properties!inner(agent_id)', { count: 'exact', head: true })
+      .eq('properties.agent_id', agentId)
+      .gte('created_at', sinceIso);
+
+    if (error) throw mapSupabaseError(error);
+    return count ?? 0;
   },
 
   // DB row deleted first (immediate gallery update); Storage removal is

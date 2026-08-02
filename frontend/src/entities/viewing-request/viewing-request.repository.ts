@@ -19,6 +19,8 @@ import type {
 // its reads are genuinely cross-cutting across both sprints.
 export interface ViewingRequestRepository {
   create(input: CreateViewingRequestInput): Promise<ViewingRequest>;
+  /** api-design.md §18 rate limit ("10 per hour, per customer") — count of the caller's own rows created since `sinceIso`, RLS-scoped like `listForCustomer`. */
+  countRecentByCustomer(sinceIso: string): Promise<number>;
   /** VIEW-004/BOOK-004, both actors — see the guard note on the implementation below. */
   cancel(id: string, reason?: string): Promise<ViewingRequest>;
   listForCustomer(input?: ListViewingRequestsInput): Promise<ViewingRequestListResult>;
@@ -85,6 +87,19 @@ export const viewingRequestRepository: ViewingRequestRepository = {
 
     if (error) throw mapSupabaseError(error);
     return mapViewingRequestRow(data);
+  },
+
+  // RLS's `viewing_requests_select_own_customer` policy scopes this to the
+  // caller's own rows, same reliance `listForCustomer` already documents —
+  // no explicit `.eq('customer_id', ...)` needed.
+  async countRecentByCustomer(sinceIso) {
+    const { count, error } = await supabase
+      .from('viewing_requests')
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', sinceIso);
+
+    if (error) throw mapSupabaseError(error);
+    return count ?? 0;
   },
 
   // Shared between the customer's own cancellation (VIEW-004) and an
