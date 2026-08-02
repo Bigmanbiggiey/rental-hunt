@@ -1,6 +1,12 @@
-import { afterEach } from 'vitest';
+import { afterEach, expect } from 'vitest';
 import { cleanup } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
+import { toHaveNoViolations } from 'jest-axe';
+
+// Sprint 8 (Quality Assurance, roadmap.md §12) — automated WCAG 2.2 AA
+// checks via axe-core, extended onto vitest's own `expect` (jest-axe's
+// matcher is jest-shaped but vitest's `expect` is API-compatible).
+expect.extend(toHaveNoViolations);
 
 // @testing-library/react's auto-cleanup relies on the test framework
 // registering a global `afterEach` — vitest.config's `test.globals` is

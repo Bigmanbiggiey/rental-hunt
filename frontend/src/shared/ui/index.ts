@@ -18,3 +18,4 @@ export * from './dialog';
 export * from './table';
 export * from './dropdown-menu';
 export * from './route-error-boundary';
+export * from './skip-link';

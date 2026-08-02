@@ -23,7 +23,15 @@
   --color-primary: #1e3a5f;
   --color-primary-foreground: #ffffff;
   --color-secondary: #059669;
-  --color-secondary-foreground: #ffffff;
+  /* Sprint 8 (Quality Assurance) — a programmatic WCAG contrast pass found
+     white text fails AA (3.77:1) against this exact green (identical value
+     to --color-success below), the same failure Sprint 3 already found and
+     fixed for --color-success-foreground/--color-warning-foreground — this
+     one was simply never revisited when that fix shipped. Same fixed dark
+     value, verified passing at 4.74:1 (matches success-foreground exactly,
+     since the background color is identical). The dark-theme override below
+     already used a correct dark value here and needed no change. */
+  --color-secondary-foreground: #0f172a;
   --color-accent: #eff6ff;
   --color-accent-foreground: #1e3a5f;
   --color-muted: #f1f5f9;

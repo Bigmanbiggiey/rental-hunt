@@ -792,6 +792,8 @@ A consolidated reference, expressed as the shape of a Tailwind v4 `@theme` block
 
 **Note (added 2026-07-27, Sprint 3):** `--color-success`/`--color-warning` had no `-foreground` pair, unused until Sprint 3's Availability/Verification badges (§12.8/§12.9) became the first real consumer. A programmatic WCAG contrast check found white text fails AA against both colors in both themes (~3.2-3.8:1); `--color-foreground`'s light-mode value (`#0F172A`) passes comfortably (4.7-8.3:1) in both themes, so `-foreground` is a **fixed** dark value in both the light and dark blocks below — not a theme-flipping pair like `error`/`destructive`, since these badge colors stay light/vivid in both themes rather than inverting.
 
+**Note (added 2026-08-02, Sprint 8):** `--color-secondary` is the identical green value to `--color-success` (`#059669`), but `--color-secondary-foreground` was never revisited when the note above shipped — a Sprint 8 accessibility pass found it still white, failing AA at 3.77:1 on any `Badge`/`Button` `secondary` variant (both render well under the WCAG "large text" size threshold, so the full 4.5:1 bar applies). Fixed to the same `#0F172A` fixed-dark value as `success-foreground`, verified passing at 4.74:1 (identical background color, identical result). The dark-theme override already used a correct dark value and needed no change.
+
 ```css
 @theme {
   /* Color */
@@ -803,7 +805,7 @@ A consolidated reference, expressed as the shape of a Tailwind v4 `@theme` block
   --color-primary: #1E3A5F;
   --color-primary-foreground: #FFFFFF;
   --color-secondary: #059669;
-  --color-secondary-foreground: #FFFFFF;
+  --color-secondary-foreground: #0F172A;    /* fixed dark value, same reasoning as success/warning-foreground below — see Sprint 8 note */
   --color-accent: #EFF6FF;
   --color-accent-foreground: #1E3A5F;
   --color-muted: #F1F5F9;
