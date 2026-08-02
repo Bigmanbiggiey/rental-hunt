@@ -5,8 +5,9 @@ import type { RouteObject } from 'react-router';
 // below (Rollup can't split a module into its own chunk if something else
 // still imports it statically through the barrel).
 import { PlaceholderPage } from '@/pages/PlaceholderPage';
-import { AdminDashboardLayout, AgentDashboardLayoutRoute, AppLayout, type NavLink } from '@/widgets';
-import { ProtectedRoute } from '@/features/authentication';
+import { AppLayout } from '@/widgets/layout/AppLayout';
+import type { NavLink } from '@/widgets/layout/navLink.types';
+import { ProtectedRoute } from '@/features/authentication/components/ProtectedRoute';
 import { PATHS } from '@/shared/config';
 
 // Route-level code splitting (Lighthouse Performance 61/100 on production
@@ -75,6 +76,22 @@ const AdminAnalyticsPage = lazy(() =>
 );
 const AdminActivityLogPage = lazy(() =>
   import('@/pages/AdminActivityLogPage').then((m) => ({ default: m.AdminActivityLogPage })),
+);
+// The two dashboard shells are lazy too (not just their page content) —
+// Sprint 8's bundle investigation (docs/roadmap.md §12) found both were
+// eagerly reachable from routes.tsx despite being agent/admin-only, pulling
+// DropdownMenu/Sheet/Avatar into every guest's initial load. AppLayout's own
+// <Suspense> already wraps this whole route tree, so no new boundary is
+// needed here.
+const AdminDashboardLayout = lazy(() =>
+  import('@/widgets/admin-dashboard-layout/AdminDashboardLayout').then((m) => ({
+    default: m.AdminDashboardLayout,
+  })),
+);
+const AgentDashboardLayoutRoute = lazy(() =>
+  import('@/widgets/agent-dashboard-layout/AgentDashboardLayout').then((m) => ({
+    default: m.AgentDashboardLayoutRoute,
+  })),
 );
 
 const PRIMARY_NAV_LINKS: NavLink[] = [{ label: 'Browse Properties', to: PATHS.public.properties }];

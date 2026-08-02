@@ -1,8 +1,9 @@
 import { Link } from 'react-router';
 import { toast } from 'sonner';
-import { Button, SheetClose, SheetContent, SheetHeader, SheetTitle } from '@/shared/ui';
-import { useAuth } from '@/entities/user';
-import { useLogout } from '@/features/authentication';
+import { Button } from '@/shared/ui/button';
+import { SheetClose, SheetContent, SheetHeader, SheetTitle } from '@/shared/ui/sheet';
+import { useAuth } from '@/entities/user/context/AuthProvider';
+import { useLogout } from '@/features/authentication/hooks/useLogout';
 import { PATHS } from '@/shared/config';
 import type { NavLink } from './navLink.types';
 

@@ -1,9 +1,10 @@
 import { Menu } from 'lucide-react';
 import { Link } from 'react-router';
 import { toast } from 'sonner';
-import { Button, Sheet, SheetTrigger } from '@/shared/ui';
-import { useAuth } from '@/entities/user';
-import { useLogout } from '@/features/authentication';
+import { Button } from '@/shared/ui/button';
+import { Sheet, SheetTrigger } from '@/shared/ui/sheet';
+import { useAuth } from '@/entities/user/context/AuthProvider';
+import { useLogout } from '@/features/authentication/hooks/useLogout';
 import { PATHS } from '@/shared/config';
 import { MobileNavDrawer } from './MobileNavDrawer';
 import type { NavLink } from './navLink.types';

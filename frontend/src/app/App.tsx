@@ -1,8 +1,8 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from 'react-router';
 import { queryClient } from '@/shared/lib';
-import { Toaster } from '@/shared/ui';
-import { AuthProvider } from '@/entities/user';
+import { Toaster } from '@/shared/ui/sonner';
+import { AuthProvider } from '@/entities/user/context/AuthProvider';
 import { router } from './router';
 
 function App() {

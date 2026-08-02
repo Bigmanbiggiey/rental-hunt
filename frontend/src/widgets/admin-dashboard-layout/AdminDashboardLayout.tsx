@@ -2,26 +2,22 @@ import { useState } from 'react';
 import { Menu } from 'lucide-react';
 import { Link, NavLink as RouterNavLink, Outlet, useLocation } from 'react-router';
 import { toast } from 'sonner';
+import { Avatar, AvatarFallback } from '@/shared/ui/avatar';
+import { Button } from '@/shared/ui/button';
 import {
-  Avatar,
-  AvatarFallback,
-  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  RouteErrorBoundary,
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/shared/ui';
+} from '@/shared/ui/dropdown-menu';
+import { RouteErrorBoundary } from '@/shared/ui/route-error-boundary';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/shared/ui/sheet';
+import { SkipLink } from '@/shared/ui/skip-link';
 import { cn } from '@/shared/lib/utils';
 import { useAuth, type UserRole } from '@/entities/user';
-import { useLogout } from '@/features/authentication';
+import { useLogout } from '@/features/authentication/hooks/useLogout';
 import { PATHS } from '@/shared/config';
 
 interface AdminNavLink {
@@ -134,6 +130,7 @@ export function AdminDashboardLayout() {
 
   return (
     <div className="flex min-h-full flex-col">
+      <SkipLink />
       <header className="bg-surface border-border sticky top-0 z-40 border-b">
         <div className="flex h-16 items-center justify-between gap-4 px-4 sm:px-6">
           <div className="flex items-center gap-2">
@@ -168,7 +165,7 @@ export function AdminDashboardLayout() {
         <aside className="border-border hidden w-64 shrink-0 border-r p-4 lg:block">
           <SidebarNav role={profile.role} />
         </aside>
-        <main className="flex-1 p-4 sm:p-6 lg:p-8">
+        <main id="main-content" className="flex-1 p-4 sm:p-6 lg:p-8">
           <RouteErrorBoundary key={location.pathname}>
             <Outlet />
           </RouteErrorBoundary>

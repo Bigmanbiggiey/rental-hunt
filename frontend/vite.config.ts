@@ -3,12 +3,27 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+import { visualizer } from 'rollup-plugin-visualizer';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    // Sprint 8 bundle investigation (docs/roadmap.md §12) — only active when
+    // explicitly requested, never affects a normal dev/test/build run.
+    ...(process.env.ANALYZE
+      ? [
+          visualizer({
+            filename: 'dist/stats.json',
+            template: 'raw-data',
+            gzipSize: true,
+          }),
+        ]
+      : []),
+  ],
   resolve: {
     alias: {
       '@': path.resolve(dirname, './src'),

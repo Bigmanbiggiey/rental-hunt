@@ -1,5 +1,6 @@
 import { Navigate, Outlet, useLocation } from 'react-router';
-import { useAuth, type UserRole } from '@/entities/user';
+import { useAuth } from '@/entities/user/context/AuthProvider';
+import type { UserRole } from '@/entities/user/user.types';
 import { PATHS } from '@/shared/config';
 
 interface ProtectedRouteProps {
