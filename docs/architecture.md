@@ -247,6 +247,8 @@ Includes:
 
 # 6. Routing Strategy
 
+**Post-Sprint-8 restructuring (2026-08-04 — see `decisions.md`'s ADR reversing Sprint 7's single shared `/admin` shell):** every authenticated role now has its own independent, top-level dashboard route group instead of one shared `/dashboard` (role-branched content) plus one shared `/admin` (moderator+admin, role-branched content). Each group is a **sibling** of the public route tree in `routes.tsx`, not nested under it — the public site's `Header`/`Footer` never render alongside a dashboard shell, which is what actually fixes a real double-navbar bug the old nesting caused (every dashboard screen was rendering both the public `Header` *and* its own dashboard header at once). Each group is wrapped by its own layout widget, all four built on one shared, generic `DashboardShell` (`widgets/dashboard-shell/`) — sidebar nav + sticky header + account menu — so the shell markup itself isn't duplicated four times, only the nav-link config differs per role.
+
 ## Public Routes
 
 * /
@@ -260,44 +262,53 @@ Includes:
 
 ## Authenticated Routes
 
-* /dashboard — role-aware (Sprint 6): renders `AgentDashboardOverviewPage` for an agent, the customer overview otherwise. One URL, not a redirect to two — `DashboardPage` branches by `profile.role` at the component level, since `ProtectedRoute`'s `allowedRoles` can only gate access, not branch content.
-* /favorites
-* /bookings
+The one authenticated route that isn't part of any specific role's dashboard — profile management is role-agnostic.
+
 * /profile
+
+## Admin Routes (role = admin only)
+
+Wrapped by `AdminDashboardLayout` (`widgets/admin-dashboard-layout/`), a thin config of the shared `DashboardShell`. Reachable only by `role: 'admin'` (`ProtectedRoute allowedRoles={['admin']}`) — moderator has its own separate group below, so this layout no longer needs the role-filtered-nav-links logic the old shared `/admin` shell required.
+
+* /admin-dashboard — `AdminOverviewPage` (platform-wide stat cards)
+* /admin-dashboard/verification-queue
+* /admin-dashboard/users
+* /admin-dashboard/agencies
+* /admin-dashboard/analytics
+* /admin-dashboard/activity-logs
+
+(The old `/admin/properties`/`/admin/bookings` `PlaceholderPage` stubs were dropped in this restructuring rather than carried forward — dead placeholder routes with no real content and no DoD dependency.)
+
+## Moderator Routes (role = moderator only)
+
+Wrapped by `ModeratorDashboardLayout` (`widgets/moderator-dashboard-layout/`) — its own route group, not a role-filtered view inside admin's. Reuses the exact same `AdminVerificationQueuePage`/`AdminActivityLogPage` components and `admin-verification`/`admin-activity-log` feature hooks admin uses (RLS already scopes what a moderator can see/do — no separate moderator-only data layer was built).
+
+* /moderator-dashboard — `ModeratorDashboardOverviewPage` (the verification queue itself — a moderator's only real dashboard action per `roadmap.md` §11's DoD)
+* /moderator-dashboard/verification-queue
+* /moderator-dashboard/activity-logs
 
 ## Agent Routes (role = agent only, Sprint 6)
 
-Nested under `/dashboard` specifically to avoid colliding with the customer's own top-level `/bookings` (Sprint 5's full viewing-history page). Wrapped by their own layout route, `AgentDashboardLayoutRoute` (`widgets/agent-dashboard-layout/`) — a 256px sidebar + top nav shell (`ui-guidelines.md` §7.4/§13.7/§13.8) — mirroring the admin-only route group's own `<ProtectedRoute allowedRoles={[...]}/>` pattern exactly. `/dashboard` itself is deliberately **not** in this group (see the note above); `AgentDashboardOverviewPage` self-wraps with the same shell component directly instead, since `AgentDashboardLayout` takes `children` rather than always rendering its own `<Outlet/>`.
+Wrapped by `AgentDashboardLayout` (`widgets/agent-dashboard-layout/`). Simplified in this restructuring: `/agent-dashboard` is now its own dedicated root, so the layout no longer needs the `children`-vs-`Outlet` duality Sprint 6's Gap 3 required back when `/dashboard` had to double as the generic authenticated landing page for every role — every agent route, including the overview, is reached the same way now, via `<Outlet/>`.
 
-* /dashboard/properties
-* /dashboard/properties/new
-* /dashboard/properties/:id/edit
-* /dashboard/bookings
-* /dashboard/analytics
+* /agent-dashboard — `AgentDashboardOverviewPage`
+* /agent-dashboard/properties
+* /agent-dashboard/properties/new
+* /agent-dashboard/properties/:id/edit
+* /agent-dashboard/bookings
+* /agent-dashboard/analytics
 
-## Admin Routes (role = moderator or admin, Sprint 7)
+## Customer Routes (role = customer only)
 
-A single shared `<ProtectedRoute allowedRoles={['moderator','admin']}/>` group, not two separate ones — per-page/per-nav-link role filtering happens inside `AdminDashboardLayout` and `AdminOverviewPage` instead (client-side UX only; RLS is the real boundary, the same philosophy `ProtectedRoute` itself documents). Wrapped by `AdminDashboardLayout` (`widgets/admin-dashboard-layout/`) — deliberately simpler than `AgentDashboardLayout`: a plain `Outlet`-only layout, no `children`-vs-`Outlet` duality, since `/admin` has no shared-URL constraint forcing self-wrapping the way `/dashboard` does for the agent/customer split.
+Wrapped by `UserDashboardLayout` (`widgets/user-dashboard-layout/`) — previously the only role with no dedicated dashboard shell at all; Favorites/Bookings were separate, unlinked top-level routes. Now structurally symmetric with the other three roles.
 
-* /admin — `AdminOverviewPage`, branches moderator-vs-admin content at the component level (same "one URL, branch content" pattern as `/dashboard` above)
-* /admin/verification-queue
-* /admin/users (admin only)
-* /admin/agencies (admin only)
-* /admin/analytics (admin only)
-* /admin/activity-logs
-* /admin/properties, /admin/bookings — deliberately `PlaceholderPage` stubs (no Sprint 7 DoD line names a dedicated screen for either; admin already has full RLS-backed access for any future session that adds them)
+* /user-dashboard — `UserDashboardOverviewPage` (upcoming + completed viewings)
+* /user-dashboard/favorites
+* /user-dashboard/bookings
 
 ---
 
-## Administrative Routes
-
-* /admin
-* /admin/properties
-* /admin/bookings
-* /admin/users
-* /admin/agencies
-
-All protected routes require authentication and role verification.
+All four dashboard route groups require authentication and role verification (`ProtectedRoute allowedRoles={[...]}`) — client-side UX only, per that component's own documented philosophy; RLS remains the real security boundary regardless of which URL a request reaches it through.
 
 ---
 

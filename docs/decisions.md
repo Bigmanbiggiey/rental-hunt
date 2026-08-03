@@ -879,6 +879,29 @@ The GUC-bypass mechanism is the narrowest of the options that don't require new 
 
 ---
 
+## ADR-031: Every role gets its own independent dashboard route group — reverses ADR-implied Sprint 7 decision to share one `/admin` shell across moderator and admin
+
+**Status:** Accepted
+**Date:** 2026-08-04
+
+**Decision:** Replace the two shared, role-branching-at-the-component-level dashboard URLs (`/dashboard` — agent vs. customer content; `/admin` — moderator vs. admin content) with four fully independent, role-owned route groups: `/admin-dashboard` (admin only), `/moderator-dashboard` (moderator only), `/agent-dashboard` (agent only, re-rooted from `/dashboard`), `/user-dashboard` (customer only, re-rooted from `/dashboard`/`/favorites`/`/bookings`). Old paths (`/admin`, `/admin/*`, `/dashboard`, `/dashboard/*`, the old top-level `/favorites`, `/bookings`) are removed outright, not redirected — a deliberate developer choice, not an oversight.
+
+**Context:** Sprint 7 (`routes.tsx`'s own comment at the time) deliberately chose one shared `/admin` shell over two separate route groups, reasoning that per-page role filtering inside `AdminDashboardLayout`/`AdminOverviewPage` was simpler than duplicating a route group for a two-role split. That reasoning didn't anticipate two consequences: (1) every dashboard route was nested inside `AppLayout`'s children, so the public site's `Header`/`Footer` rendered underneath every dashboard's own header at the same time — a real, user-reported double-navbar bug, present since Sprint 6/7 but never flagged; (2) the developer's own product direction, given directly, was that every role should have a URL identity of its own ("admin = admin-dashboard, agent = agent-dashboard, moderator = moderator-dashboard, customer = user-dashboard"), which a shared, role-branched shell structurally can't express.
+
+A related, independently-found bug shaped the redirect side of this change: `useLogin`'s `onSuccess` fired `invalidateQueries` (fire-and-forget) and the caller navigated immediately after — a genuine race where `ProtectedRoute`'s next render still saw the pre-login cached profile (refetch not yet resolved) and bounced back to `/login`. Invisible against local Supabase's near-zero latency; reliably reproducible against a real remote project. Fixed by writing the already-resolved profile into the query cache synchronously (`setQueryData`) instead of relying on an async refetch to win a timing race.
+
+A second redirect bug was found during this change's own manual verification pass (not inherited from before): `LoginForm` unconditionally honored `location.state.from` (set by `ProtectedRoute` whenever a visit to a specific URL got bounced to `/login`) without checking whether the *newly logged-in* role could actually reach that URL. Concretely: log out of an agent account from `/agent-dashboard` (setting `state.from` to `/agent-dashboard`), then log into a moderator account in the same browser — the moderator was sent to `/agent-dashboard`, which `ProtectedRoute` immediately bounced to the guest homepage, since `allowedRoles={['agent']}` excludes moderator. Every role now having a strictly separate route group made this far more likely to actually happen (previously `/dashboard` and `/admin` each covered 2+ roles, narrowing the mismatch window). Fixed with `isReachableByRole()`, which only honors `state.from` when the logged-in role's own dashboard prefix (or the shared `/profile`) actually contains it; otherwise falls back to `roleLandingPath()`.
+
+**Rationale:** Structural role separation directly serves the stated product requirement, and as a side effect resolves the double-navbar bug for free — moving each dashboard group to a sibling of `AppLayout` (rather than nested under it) means only one header ever renders per screen. The four layouts share one generic `DashboardShell` (`widgets/dashboard-shell/`) rather than four copies of the same sidebar/header markup — the four-way duplication crossed this project's own "extract on the third real duplicate" threshold (`coding-standards.md` §7) immediately, since three of the four shells (admin, agent, and the newly-needed moderator/customer ones) are structurally identical, differing only in nav-link config. Moderator reuses admin's exact page components (`AdminVerificationQueuePage`, `AdminActivityLogPage`) rather than forking them — RLS already scopes what a moderator can see/do, so there's no new data layer, only a new URL and a narrower nav.
+
+Old URLs are removed outright rather than redirected, per explicit developer decision — this is a pre-launch (`v0.1.0-dev`) application with a small, developer-controlled set of test accounts, not a live product with external bookmarks/links to preserve.
+
+**Consequences:** `AgentDashboardLayout` lost its `children`-vs-`Outlet` duality (Sprint 6's Gap 3) — `/agent-dashboard` no longer has to double as a generic landing page for another role, so every agent route, including the overview, now reaches the layout the same way. `AdminDashboardLayout` lost its role-filtered nav-link logic — moderator no longer shares admin's route tree, so there's nothing to filter. A future role split of this kind should default to the same shape: one shared `DashboardShell` config, not either a monolithic role-branched shell or four independently-built ones.
+
+**Related Documents:** `architecture.md` §6 (rewritten), `paths.constants.ts`, `roadmap.md` §11 (moderator/admin DoD split, now expressed as route separation rather than nav filtering), ADR-029 (the prior Sprint 6/7 shell precedent this supersedes).
+
+---
+
 # Future ADR Process
 
 | Aspect | Rule |
