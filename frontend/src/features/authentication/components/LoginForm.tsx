@@ -3,14 +3,30 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLocation, useNavigate, type Location } from 'react-router';
-import { Alert, AlertDescription, AlertTitle, Button, FieldError, Input, Label } from '@/shared/ui';
+import { Alert, AlertDescription, AlertTitle, Button, FieldError, Input, Label, PasswordInput } from '@/shared/ui';
 import { isAppError } from '@/shared/lib/errors';
 import { PATHS } from '@/shared/config';
+import type { UserRole } from '@/entities/user';
 import { useLogin } from '../hooks/useLogin';
 import { LoginSchema, type LoginInput } from '../schemas/login.schema';
 
 interface LocationState {
   from?: Location;
+}
+
+// Where a role lands when there's no "return to the page you were trying to
+// reach" state (ProtectedRoute's redirect). /dashboard is the generic
+// authenticated landing page (branches agent vs. customer content itself,
+// per DashboardPage.tsx) — moderator/admin have no content there at all, so
+// they go straight to /admin instead of hitting that gap.
+function roleLandingPath(role: UserRole): string {
+  switch (role) {
+    case 'moderator':
+    case 'admin':
+      return PATHS.admin.root;
+    default:
+      return PATHS.authenticated.dashboard;
+  }
 }
 
 export function LoginForm() {
@@ -29,12 +45,12 @@ export function LoginForm() {
 
   const onSubmit = handleSubmit((values) => {
     mutate(values, {
-      onSuccess: () => {
+      onSuccess: (data) => {
         toast.success('Welcome back.');
         const state = location.state as LocationState | null;
         const redirectTo = state?.from
           ? `${state.from.pathname}${state.from.search}`
-          : PATHS.public.home;
+          : roleLandingPath(data.user.role);
         navigate(redirectTo, { replace: true });
       },
     });
@@ -76,9 +92,8 @@ export function LoginForm() {
           Password <span aria-hidden="true">*</span>
           <span className="sr-only"> (required)</span>
         </Label>
-        <Input
+        <PasswordInput
           id="password"
-          type="password"
           autoComplete="current-password"
           aria-invalid={!!errors.password}
           aria-describedby={errors.password ? 'password-error' : undefined}

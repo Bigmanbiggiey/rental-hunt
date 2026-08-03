@@ -1,4 +1,4 @@
-import { Link } from 'react-router';
+import { Link, Navigate } from 'react-router';
 import {
   useViewingRequests,
   useViewingRequestsRealtime,
@@ -15,10 +15,16 @@ const SECTION_PAGE_SIZE = 5;
 // by role — not a redirect to two URLs, since `ProtectedRoute`'s
 // `allowedRoles` only gates access, it can't branch content, and a redirect
 // would add an extra hop plus two bookmarkable URLs for one conceptual
-// landing page.
+// landing page. moderator/admin have no content here at all (there's
+// nothing "their own" to book/favorite) — found during manual testing that
+// this branch silently fell through to the customer view for them, which
+// makes no sense for those roles, so they're sent to /admin instead.
 function DashboardPage() {
   const { profile } = useAuth();
   if (profile?.role === 'agent') return <AgentDashboardOverviewPage />;
+  if (profile?.role === 'moderator' || profile?.role === 'admin') {
+    return <Navigate to={PATHS.admin.root} replace />;
+  }
   return <CustomerDashboardOverview />;
 }
 
