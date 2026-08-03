@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { Menu } from 'lucide-react';
+import { ExternalLink, Menu } from 'lucide-react';
 import { Link, NavLink as RouterNavLink, useLocation } from 'react-router';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback } from '@/shared/ui/avatar';
@@ -78,6 +78,43 @@ function SidebarNav({
   );
 }
 
+// A way back to the public site, present in every dashboard's sidebar —
+// found missing 2026-08-04, right after the four-dashboard restructuring
+// removed the last incidental way to get there (the old shared shells at
+// least kept AppLayout's own Header, which had a home link; the new
+// self-contained shells don't render it at all).
+function ViewSiteLink({ onNavigate }: { onNavigate?: () => void }) {
+  return (
+    <div className="border-border mt-2 border-t pt-2">
+      <Link
+        to={PATHS.public.home}
+        onClick={onNavigate}
+        className="text-body-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground flex items-center gap-2 rounded-md px-3 py-2 font-medium transition-colors"
+      >
+        <ExternalLink className="size-4" aria-hidden="true" />
+        View site
+      </Link>
+    </div>
+  );
+}
+
+function SidebarContent({
+  navLabel,
+  navLinks,
+  onNavigate,
+}: {
+  navLabel: string;
+  navLinks: DashboardNavLink[];
+  onNavigate?: () => void;
+}) {
+  return (
+    <div className="flex flex-col">
+      <SidebarNav navLabel={navLabel} navLinks={navLinks} onNavigate={onNavigate} />
+      <ViewSiteLink onNavigate={onNavigate} />
+    </div>
+  );
+}
+
 function UserMenu() {
   const { profile } = useAuth();
   const { mutate: logout, isPending } = useLogout();
@@ -149,7 +186,7 @@ export function DashboardShell({ brandHref, navLabel, navLinks, children }: Dash
                   <SheetTitle>Rental Hunt KE</SheetTitle>
                 </SheetHeader>
                 <div className="mt-6">
-                  <SidebarNav
+                  <SidebarContent
                     navLabel={navLabel}
                     navLinks={navLinks}
                     onNavigate={() => setDrawerOpen(false)}
@@ -171,7 +208,7 @@ export function DashboardShell({ brandHref, navLabel, navLinks, children }: Dash
 
       <div className="flex flex-1">
         <aside className="border-border hidden w-64 shrink-0 border-r p-4 lg:block">
-          <SidebarNav navLabel={navLabel} navLinks={navLinks} />
+          <SidebarContent navLabel={navLabel} navLinks={navLinks} />
         </aside>
         <main id="main-content" className="flex-1 p-4 sm:p-6 lg:p-8">
           <RouteErrorBoundary key={location.pathname}>{children}</RouteErrorBoundary>
