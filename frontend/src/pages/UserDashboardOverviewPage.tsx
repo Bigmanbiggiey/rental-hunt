@@ -1,37 +1,22 @@
-import { Link, Navigate } from 'react-router';
+import { Link } from 'react-router';
 import {
   useViewingRequests,
   useViewingRequestsRealtime,
   ViewingRequestList,
 } from '@/features/viewing-requests';
-import { AgentDashboardOverviewPage } from './AgentDashboardOverviewPage';
 import { Alert, AlertDescription, Skeleton } from '@/shared/ui';
 import { PATHS } from '@/shared/config';
-import { useAuth } from '@/entities/user';
 
 const SECTION_PAGE_SIZE = 5;
 
-// Gap 3 (Sprint 6 plan): `/dashboard` stays one URL, branching its content
-// by role — not a redirect to two URLs, since `ProtectedRoute`'s
-// `allowedRoles` only gates access, it can't branch content, and a redirect
-// would add an extra hop plus two bookmarkable URLs for one conceptual
-// landing page. moderator/admin have no content here at all (there's
-// nothing "their own" to book/favorite) — found during manual testing that
-// this branch silently fell through to the customer view for them, which
-// makes no sense for those roles, so they're sent to /admin instead.
-function DashboardPage() {
-  const { profile } = useAuth();
-  if (profile?.role === 'agent') return <AgentDashboardOverviewPage />;
-  if (profile?.role === 'moderator' || profile?.role === 'admin') {
-    return <Navigate to={PATHS.admin.root} replace />;
-  }
-  return <CustomerDashboardOverview />;
-}
-
-// CUST-001 (Upcoming) + CUST-002 (Completed). Realtime status updates
-// (api-design.md §11) are subscribed once for the whole page, not per
-// section, to avoid duplicate `postgres_changes` channels.
-function CustomerDashboardOverview() {
+// CUST-001 (Upcoming) + CUST-002 (Completed). Reached at /user-dashboard,
+// extracted out of the old DashboardPage's customer branch (post-Sprint-8
+// restructuring — customer now has its own dedicated route group, same as
+// every other role, so there's no more role-branching to do at this level).
+// Realtime status updates (api-design.md §11) are subscribed once for the
+// whole page, not per section, to avoid duplicate `postgres_changes`
+// channels.
+function UserDashboardOverviewPage() {
   useViewingRequestsRealtime();
 
   const upcoming = useViewingRequests({
@@ -46,7 +31,7 @@ function CustomerDashboardOverview() {
   });
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-8 p-4 sm:p-6 lg:p-8">
+    <div className="flex flex-col gap-8">
       <h1 className="text-h1 text-foreground font-semibold">Dashboard</h1>
 
       <section className="flex flex-col gap-3">
@@ -54,7 +39,7 @@ function CustomerDashboardOverview() {
           <h2 className="text-h2 text-foreground font-semibold">Upcoming Viewings</h2>
           {upcoming.data && upcoming.data.meta.totalPages > 1 && (
             <Link
-              to={PATHS.authenticated.bookings}
+              to={PATHS.userDashboard.bookings}
               className="text-body-sm text-primary font-medium hover:underline"
             >
               View all
@@ -82,7 +67,7 @@ function CustomerDashboardOverview() {
           <h2 className="text-h2 text-foreground font-semibold">Completed Viewings</h2>
           {completed.data && completed.data.meta.totalPages > 1 && (
             <Link
-              to={PATHS.authenticated.bookings}
+              to={PATHS.userDashboard.bookings}
               className="text-body-sm text-primary font-medium hover:underline"
             >
               View all
@@ -108,4 +93,4 @@ function CustomerDashboardOverview() {
   );
 }
 
-export { DashboardPage };
+export { UserDashboardOverviewPage };

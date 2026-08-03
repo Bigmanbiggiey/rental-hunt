@@ -1,4 +1,4 @@
-import { lazy } from 'react';
+import { lazy, Suspense } from 'react';
 import type { RouteObject } from 'react-router';
 // Imported directly (not from the `@/pages` barrel) — the barrel statically
 // re-exports every page, which would otherwise defeat the dynamic imports
@@ -8,6 +8,7 @@ import { PlaceholderPage } from '@/pages/PlaceholderPage';
 import { AppLayout } from '@/widgets/layout/AppLayout';
 import type { NavLink } from '@/widgets/layout/navLink.types';
 import { ProtectedRoute } from '@/features/authentication/components/ProtectedRoute';
+import { RouteLoadingFallback } from '@/shared/ui/route-loading-fallback';
 import { PATHS } from '@/shared/config';
 
 // Route-level code splitting (Lighthouse Performance 61/100 on production
@@ -38,14 +39,17 @@ const ResetPasswordPage = lazy(() =>
 const ProfilePage = lazy(() =>
   import('@/pages/ProfilePage').then((m) => ({ default: m.ProfilePage })),
 );
-const DashboardPage = lazy(() =>
-  import('@/pages/DashboardPage').then((m) => ({ default: m.DashboardPage })),
+const UserDashboardOverviewPage = lazy(() =>
+  import('@/pages/UserDashboardOverviewPage').then((m) => ({ default: m.UserDashboardOverviewPage })),
 );
 const FavoritesPage = lazy(() =>
   import('@/pages/FavoritesPage').then((m) => ({ default: m.FavoritesPage })),
 );
 const BookingsPage = lazy(() =>
   import('@/pages/BookingsPage').then((m) => ({ default: m.BookingsPage })),
+);
+const AgentDashboardOverviewPage = lazy(() =>
+  import('@/pages/AgentDashboardOverviewPage').then((m) => ({ default: m.AgentDashboardOverviewPage })),
 );
 const AgentPropertiesPage = lazy(() =>
   import('@/pages/AgentPropertiesPage').then((m) => ({ default: m.AgentPropertiesPage })),
@@ -77,20 +81,36 @@ const AdminAnalyticsPage = lazy(() =>
 const AdminActivityLogPage = lazy(() =>
   import('@/pages/AdminActivityLogPage').then((m) => ({ default: m.AdminActivityLogPage })),
 );
-// The two dashboard shells are lazy too (not just their page content) —
-// Sprint 8's bundle investigation (docs/roadmap.md §12) found both were
-// eagerly reachable from routes.tsx despite being agent/admin-only, pulling
-// DropdownMenu/Sheet/Avatar into every guest's initial load. AppLayout's own
-// <Suspense> already wraps this whole route tree, so no new boundary is
-// needed here.
+const ModeratorDashboardOverviewPage = lazy(() =>
+  import('@/pages/ModeratorDashboardOverviewPage').then((m) => ({
+    default: m.ModeratorDashboardOverviewPage,
+  })),
+);
+// The four dashboard shells are lazy too (not just their page content) —
+// Sprint 8's bundle investigation (docs/roadmap.md §12) found eagerly
+// importing role-gated layout widgets pulls DropdownMenu/Sheet/Avatar into
+// every guest's initial load. Each dashboard route group below wraps its own
+// lazy layout in its own <Suspense> — post-Sprint-8 restructuring (see
+// decisions.md) moved every dashboard group out of AppLayout's children, so
+// they no longer inherit AppLayout's single top-level Suspense boundary.
 const AdminDashboardLayout = lazy(() =>
   import('@/widgets/admin-dashboard-layout/AdminDashboardLayout').then((m) => ({
     default: m.AdminDashboardLayout,
   })),
 );
-const AgentDashboardLayoutRoute = lazy(() =>
+const ModeratorDashboardLayout = lazy(() =>
+  import('@/widgets/moderator-dashboard-layout/ModeratorDashboardLayout').then((m) => ({
+    default: m.ModeratorDashboardLayout,
+  })),
+);
+const AgentDashboardLayout = lazy(() =>
   import('@/widgets/agent-dashboard-layout/AgentDashboardLayout').then((m) => ({
-    default: m.AgentDashboardLayoutRoute,
+    default: m.AgentDashboardLayout,
+  })),
+);
+const UserDashboardLayout = lazy(() =>
+  import('@/widgets/user-dashboard-layout/UserDashboardLayout').then((m) => ({
+    default: m.UserDashboardLayout,
   })),
 );
 
@@ -108,66 +128,96 @@ export const routeConfig: RouteObject[] = [
       { path: PATHS.public.forgotPassword, element: <ForgotPasswordPage /> },
       { path: PATHS.public.resetPassword, element: <ResetPasswordPage /> },
       {
-        // Any authenticated role (architecture.md §6's "Authenticated Routes").
+        // Any authenticated role — Profile is the one authenticated route
+        // that isn't part of any specific role's dashboard.
         element: <ProtectedRoute />,
-        children: [
-          { path: PATHS.authenticated.dashboard, element: <DashboardPage /> },
-          { path: PATHS.authenticated.favorites, element: <FavoritesPage /> },
-          { path: PATHS.authenticated.bookings, element: <BookingsPage /> },
-          { path: PATHS.authenticated.profile, element: <ProfilePage /> },
-        ],
-      },
-      {
-        // Moderator + Admin (Sprint 7, roadmap.md §11) — a single shared
-        // `/admin` shell rather than two separate route groups; per-page/
-        // per-nav-link role filtering happens inside `AdminDashboardLayout`
-        // and `AdminOverviewPage` instead. `ProtectedRoute`'s own documented
-        // philosophy already treats this route guard as client-side UX,
-        // never the real security boundary (RLS is) — the same reasoning
-        // that justifies not duplicating a second route group here.
-        element: <ProtectedRoute allowedRoles={['moderator', 'admin']} />,
-        children: [
-          {
-            element: <AdminDashboardLayout />,
-            children: [
-              { path: PATHS.admin.root, element: <AdminOverviewPage /> },
-              { path: PATHS.admin.verificationQueue, element: <AdminVerificationQueuePage /> },
-              { path: PATHS.admin.activityLogs, element: <AdminActivityLogPage /> },
-              // Admin-only pages below still sit inside the shared
-              // allowedRoles gate above — a moderator hitting these URLs
-              // directly is a client-side UX gap only, since RLS blocks the
-              // actual reads/writes regardless (`agencies_select_all_agent_moderator_admin`/
-              // `agencies_insert_admin` etc., database.md §9).
-              { path: PATHS.admin.users, element: <AdminUsersPage /> },
-              { path: PATHS.admin.agencies, element: <AdminAgenciesPage /> },
-              { path: PATHS.admin.analytics, element: <AdminAnalyticsPage /> },
-              { path: PATHS.admin.properties, element: <PlaceholderPage title="Admin — Properties" /> },
-              { path: PATHS.admin.bookings, element: <PlaceholderPage title="Admin — Bookings" /> },
-            ],
-          },
-        ],
-      },
-      {
-        // Agent only (Sprint 6, Gap 3) — mirrors the admin-only group above
-        // exactly. `/dashboard` itself is deliberately NOT here: it stays in
-        // the generic authenticated group and branches role at the
-        // `DashboardPage` component level instead (see that file's own
-        // comment) — `AgentDashboardLayoutRoute` only wraps these four.
-        element: <ProtectedRoute allowedRoles={['agent']} />,
-        children: [
-          {
-            element: <AgentDashboardLayoutRoute />,
-            children: [
-              { path: PATHS.authenticated.agentProperties, element: <AgentPropertiesPage /> },
-              { path: PATHS.authenticated.agentPropertyNew, element: <AgentPropertyFormPage /> },
-              { path: PATHS.authenticated.agentPropertyEdit, element: <AgentPropertyFormPage /> },
-              { path: PATHS.authenticated.agentBookings, element: <AgentBookingsPage /> },
-              { path: PATHS.authenticated.agentAnalytics, element: <AgentAnalyticsPage /> },
-            ],
-          },
-        ],
+        children: [{ path: PATHS.authenticated.profile, element: <ProfilePage /> }],
       },
       { path: '*', element: <PlaceholderPage title="Not Found" /> },
+    ],
+  },
+  // Four independent, role-owned dashboard route groups (post-Sprint-8
+  // restructuring — see decisions.md for the ADR reversing Sprint 7's single
+  // shared `/admin` shell). Each is a top-level sibling of AppLayout above,
+  // not nested under it, specifically so its own dashboard shell is the only
+  // header/nav that renders — the public site's Header/Footer never mount
+  // alongside a dashboard. React Router ranks routes by path specificity
+  // across the whole tree regardless of nesting, so these still correctly
+  // beat AppLayout's own `*` catch-all above.
+  {
+    element: <ProtectedRoute allowedRoles={['admin']} />,
+    children: [
+      {
+        element: (
+          <Suspense fallback={<RouteLoadingFallback />}>
+            <AdminDashboardLayout />
+          </Suspense>
+        ),
+        children: [
+          { path: PATHS.adminDashboard.root, element: <AdminOverviewPage /> },
+          { path: PATHS.adminDashboard.verificationQueue, element: <AdminVerificationQueuePage /> },
+          { path: PATHS.adminDashboard.users, element: <AdminUsersPage /> },
+          { path: PATHS.adminDashboard.agencies, element: <AdminAgenciesPage /> },
+          { path: PATHS.adminDashboard.analytics, element: <AdminAnalyticsPage /> },
+          { path: PATHS.adminDashboard.activityLogs, element: <AdminActivityLogPage /> },
+        ],
+      },
+    ],
+  },
+  {
+    element: <ProtectedRoute allowedRoles={['moderator']} />,
+    children: [
+      {
+        element: (
+          <Suspense fallback={<RouteLoadingFallback />}>
+            <ModeratorDashboardLayout />
+          </Suspense>
+        ),
+        children: [
+          { path: PATHS.moderatorDashboard.root, element: <ModeratorDashboardOverviewPage /> },
+          // Same page components admin uses (RLS already scopes what a
+          // moderator can see/do — no separate moderator-only data layer).
+          { path: PATHS.moderatorDashboard.verificationQueue, element: <AdminVerificationQueuePage /> },
+          { path: PATHS.moderatorDashboard.activityLogs, element: <AdminActivityLogPage /> },
+        ],
+      },
+    ],
+  },
+  {
+    element: <ProtectedRoute allowedRoles={['agent']} />,
+    children: [
+      {
+        element: (
+          <Suspense fallback={<RouteLoadingFallback />}>
+            <AgentDashboardLayout />
+          </Suspense>
+        ),
+        children: [
+          { path: PATHS.agentDashboard.root, element: <AgentDashboardOverviewPage /> },
+          { path: PATHS.agentDashboard.properties, element: <AgentPropertiesPage /> },
+          { path: PATHS.agentDashboard.propertyNew, element: <AgentPropertyFormPage /> },
+          { path: PATHS.agentDashboard.propertyEdit, element: <AgentPropertyFormPage /> },
+          { path: PATHS.agentDashboard.bookings, element: <AgentBookingsPage /> },
+          { path: PATHS.agentDashboard.analytics, element: <AgentAnalyticsPage /> },
+        ],
+      },
+    ],
+  },
+  {
+    element: <ProtectedRoute allowedRoles={['customer']} />,
+    children: [
+      {
+        element: (
+          <Suspense fallback={<RouteLoadingFallback />}>
+            <UserDashboardLayout />
+          </Suspense>
+        ),
+        children: [
+          { path: PATHS.userDashboard.root, element: <UserDashboardOverviewPage /> },
+          { path: PATHS.userDashboard.favorites, element: <FavoritesPage /> },
+          { path: PATHS.userDashboard.bookings, element: <BookingsPage /> },
+        ],
+      },
     ],
   },
 ];

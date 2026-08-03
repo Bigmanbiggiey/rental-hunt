@@ -48,7 +48,7 @@ function AgentPropertyFormPage() {
           // exists — a fresh create routes straight into its own edit page
           // so the agent can add images/submit for verification next.
           if (!isEditMode) {
-            navigate(PATHS.authenticated.agentPropertyEdit.replace(':id', saved.id));
+            navigate(PATHS.agentDashboard.propertyEdit.replace(':id', saved.id));
           }
         }}
       />

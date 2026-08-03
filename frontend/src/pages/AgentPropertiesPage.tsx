@@ -26,7 +26,7 @@ function AgentPropertiesPage() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-h1 text-foreground font-semibold">Properties</h1>
-        <Button onClick={() => navigate(PATHS.authenticated.agentPropertyNew)}>
+        <Button onClick={() => navigate(PATHS.agentDashboard.propertyNew)}>
           <Plus aria-hidden="true" />
           New listing
         </Button>
@@ -67,7 +67,7 @@ function AgentPropertiesPage() {
           <AgentPropertyTable
             properties={data.data}
             onEdit={(propertyId) =>
-              navigate(PATHS.authenticated.agentPropertyEdit.replace(':id', propertyId))
+              navigate(PATHS.agentDashboard.propertyEdit.replace(':id', propertyId))
             }
           />
 

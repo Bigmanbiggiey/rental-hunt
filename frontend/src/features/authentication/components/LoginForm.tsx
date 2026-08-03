@@ -15,17 +15,43 @@ interface LocationState {
 }
 
 // Where a role lands when there's no "return to the page you were trying to
-// reach" state (ProtectedRoute's redirect). /dashboard is the generic
-// authenticated landing page (branches agent vs. customer content itself,
-// per DashboardPage.tsx) — moderator/admin have no content there at all, so
-// they go straight to /admin instead of hitting that gap.
+// reach" state (ProtectedRoute's redirect), or when that state points
+// somewhere the logged-in role can't reach. Every role has its own
+// dedicated dashboard route group (post-Sprint-8 restructuring — see
+// decisions.md).
 function roleLandingPath(role: UserRole): string {
   switch (role) {
-    case 'moderator':
     case 'admin':
-      return PATHS.admin.root;
-    default:
-      return PATHS.authenticated.dashboard;
+      return PATHS.adminDashboard.root;
+    case 'moderator':
+      return PATHS.moderatorDashboard.root;
+    case 'agent':
+      return PATHS.agentDashboard.root;
+    case 'customer':
+      return PATHS.userDashboard.root;
+  }
+}
+
+// `state.from` is set whenever ProtectedRoute bounced a visit to a specific
+// URL — but it's from *before* this login, so it isn't necessarily reachable
+// by *this* role (e.g. logging out of an agent account from
+// /agent-dashboard, then logging into a moderator account: naively honoring
+// state.from would send the moderator to a page only agents can reach,
+// which ProtectedRoute then bounces to the guest homepage — found
+// 2026-08-04 testing the new per-role dashboards). Only honor it if this
+// role can actually reach it; otherwise fall back to the role's own
+// dashboard root.
+function isReachableByRole(pathname: string, role: UserRole): boolean {
+  if (pathname === PATHS.authenticated.profile) return true;
+  switch (role) {
+    case 'admin':
+      return pathname.startsWith(PATHS.adminDashboard.root);
+    case 'moderator':
+      return pathname.startsWith(PATHS.moderatorDashboard.root);
+    case 'agent':
+      return pathname.startsWith(PATHS.agentDashboard.root);
+    case 'customer':
+      return pathname.startsWith(PATHS.userDashboard.root);
   }
 }
 
@@ -48,9 +74,10 @@ export function LoginForm() {
       onSuccess: (data) => {
         toast.success('Welcome back.');
         const state = location.state as LocationState | null;
-        const redirectTo = state?.from
-          ? `${state.from.pathname}${state.from.search}`
-          : roleLandingPath(data.user.role);
+        const redirectTo =
+          state?.from && isReachableByRole(state.from.pathname, data.user.role)
+            ? `${state.from.pathname}${state.from.search}`
+            : roleLandingPath(data.user.role);
         navigate(redirectTo, { replace: true });
       },
     });

@@ -14,36 +14,41 @@ export const PATHS = {
     forgotPassword: '/forgot-password',
     resetPassword: '/reset-password',
   },
+  // Every authenticated role has its own independent dashboard route group
+  // (post-Sprint-8 restructuring, 2026-08-04 — see decisions.md for the ADR
+  // reversing Sprint 7's single shared `/admin` shell). Profile is the one
+  // authenticated route that stays outside all four — it's role-agnostic.
   authenticated: {
-    dashboard: '/dashboard',
-    favorites: '/favorites',
-    bookings: '/bookings',
     profile: '/profile',
-    // Sprint 6, agent role only — nested under /dashboard specifically to
-    // avoid colliding with the customer's own top-level /bookings (Sprint
-    // 5's full viewing-history page). /dashboard itself stays one URL,
-    // branching its content by role (Gap 3, DashboardPage.tsx).
-    agentProperties: '/dashboard/properties',
-    agentPropertyNew: '/dashboard/properties/new',
-    agentPropertyEdit: '/dashboard/properties/:id/edit',
-    agentBookings: '/dashboard/bookings',
-    agentAnalytics: '/dashboard/analytics',
   },
-  admin: {
-    root: '/admin',
-    properties: '/admin/properties',
-    bookings: '/admin/bookings',
-    users: '/admin/users',
-    agencies: '/admin/agencies',
-    // Sprint 7 — roadmap.md §11. /admin/properties and /admin/bookings stay
-    // PlaceholderPage stubs: neither has an unambiguous Sprint 7 DoD
-    // dependency (verification is fully covered by verificationQueue below;
-    // admin viewing-request oversight is already reachable through
-    // viewingRequestRepository's own Moderator/Admin RLS permissions without
-    // a dedicated screen) — building either now would be scope creep beyond
-    // what the DoD actually names.
-    verificationQueue: '/admin/verification-queue',
-    analytics: '/admin/analytics',
-    activityLogs: '/admin/activity-logs',
+  adminDashboard: {
+    root: '/admin-dashboard',
+    verificationQueue: '/admin-dashboard/verification-queue',
+    users: '/admin-dashboard/users',
+    agencies: '/admin-dashboard/agencies',
+    analytics: '/admin-dashboard/analytics',
+    activityLogs: '/admin-dashboard/activity-logs',
+  },
+  // Moderator's own route group, not a role-filtered view inside admin's —
+  // reuses the same admin-verification/admin-activity-log feature hooks and
+  // page components admin uses (no new backend/data work), just mounted at
+  // its own URL prefix with its own, narrower nav.
+  moderatorDashboard: {
+    root: '/moderator-dashboard',
+    verificationQueue: '/moderator-dashboard/verification-queue',
+    activityLogs: '/moderator-dashboard/activity-logs',
+  },
+  agentDashboard: {
+    root: '/agent-dashboard',
+    properties: '/agent-dashboard/properties',
+    propertyNew: '/agent-dashboard/properties/new',
+    propertyEdit: '/agent-dashboard/properties/:id/edit',
+    bookings: '/agent-dashboard/bookings',
+    analytics: '/agent-dashboard/analytics',
+  },
+  userDashboard: {
+    root: '/user-dashboard',
+    favorites: '/user-dashboard/favorites',
+    bookings: '/user-dashboard/bookings',
   },
 } as const;

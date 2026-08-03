@@ -101,8 +101,8 @@ function renderAt(path: string) {
       <AuthProvider>
         <MemoryRouter initialEntries={[path]}>
           <Routes>
-            <Route path={PATHS.authenticated.agentPropertyEdit} element={<AgentPropertyFormPage />} />
-            <Route path={PATHS.authenticated.agentPropertyNew} element={<AgentPropertyFormPage />} />
+            <Route path={PATHS.agentDashboard.propertyEdit} element={<AgentPropertyFormPage />} />
+            <Route path={PATHS.agentDashboard.propertyNew} element={<AgentPropertyFormPage />} />
           </Routes>
         </MemoryRouter>
       </AuthProvider>
@@ -114,7 +114,7 @@ describe('AgentPropertyFormPage (integration, local Supabase)', () => {
   it('renders an empty create form with no Verification/Images sections (AGENT-002)', async () => {
     await signUpFormAgent('formCreate');
 
-    renderAt(PATHS.authenticated.agentPropertyNew);
+    renderAt(PATHS.agentDashboard.propertyNew);
 
     expect(await screen.findByRole('heading', { name: 'New listing' })).toBeInTheDocument();
     expect(screen.getByLabelText(/title/i)).toHaveValue('');
@@ -128,7 +128,7 @@ describe('AgentPropertyFormPage (integration, local Supabase)', () => {
     const agent = await signUpFormAgent('formEdit');
     const propertyId = await createTestProperty(agent.agencyId, agent.agentId);
 
-    renderAt(PATHS.authenticated.agentPropertyEdit.replace(':id', propertyId));
+    renderAt(PATHS.agentDashboard.propertyEdit.replace(':id', propertyId));
 
     expect(await screen.findByRole('heading', { name: 'Edit listing' }, { timeout: 10000 })).toBeInTheDocument();
     expect(screen.getByLabelText(/title/i)).toHaveValue('Form Test Property Title');
@@ -145,7 +145,7 @@ describe('AgentPropertyFormPage (integration, local Supabase)', () => {
     await supabase.auth.signOut();
 
     await signUpFormAgent('formOther');
-    renderAt(PATHS.authenticated.agentPropertyEdit.replace(':id', propertyId));
+    renderAt(PATHS.agentDashboard.propertyEdit.replace(':id', propertyId));
 
     expect(
       await screen.findByText(/this property could not be found/i, {}, { timeout: 10000 }),

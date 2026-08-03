@@ -10,6 +10,8 @@ import { PropertiesPage } from './PropertiesPage';
 import { PropertyDetailPage } from './PropertyDetailPage';
 import { AgentDashboardOverviewPage } from './AgentDashboardOverviewPage';
 import { AdminOverviewPage } from './AdminOverviewPage';
+import { ModeratorDashboardOverviewPage } from './ModeratorDashboardOverviewPage';
+import { UserDashboardOverviewPage } from './UserDashboardOverviewPage';
 import { LoginPage } from './LoginPage';
 import { AgentPropertiesPage } from './AgentPropertiesPage';
 import { AdminVerificationQueuePage } from './AdminVerificationQueuePage';
@@ -19,6 +21,11 @@ import { AdminVerificationQueuePage } from './AdminVerificationQueuePage';
 // Realtime hook.
 vi.mock('@/features/agent-properties/hooks/useAgentPropertyVerificationRealtime', () => ({
   useAgentPropertyVerificationRealtime: () => {},
+}));
+// Same quirk, `UserDashboardOverviewPage` mounts this one (found 2026-08-04
+// adding this page's own a11y coverage).
+vi.mock('@/features/viewing-requests/hooks/useViewingRequestsRealtime', () => ({
+  useViewingRequestsRealtime: () => {},
 }));
 
 /**
@@ -75,7 +82,7 @@ describe('Primary screens — axe accessibility (WCAG 2.2 AA)', () => {
 
   it('AgentDashboardOverviewPage has no axe violations', async () => {
     await signIn('agent2.seed@rentalhunt.test');
-    const { container } = renderWithProviders(<AgentDashboardOverviewPage />, ['/dashboard']);
+    const { container } = renderWithProviders(<AgentDashboardOverviewPage />, ['/agent-dashboard']);
     await screen.findByText('Dashboard', {}, { timeout: 10000 });
     await waitFor(() => expect(screen.queryByText('Total properties')).toBeInTheDocument());
     expect(await axe(container)).toHaveNoViolations();
@@ -83,8 +90,23 @@ describe('Primary screens — axe accessibility (WCAG 2.2 AA)', () => {
 
   it('AdminOverviewPage has no axe violations', async () => {
     await signIn('admin1.seed@rentalhunt.test');
-    const { container } = renderWithProviders(<AdminOverviewPage />, ['/admin']);
+    const { container } = renderWithProviders(<AdminOverviewPage />, ['/admin-dashboard']);
     await screen.findByText('Admin Overview', {}, { timeout: 10000 });
+    expect(await axe(container)).toHaveNoViolations();
+  }, 15000);
+
+  it('ModeratorDashboardOverviewPage has no axe violations', async () => {
+    await signIn('moderator1.seed@rentalhunt.test');
+    const { container } = renderWithProviders(<ModeratorDashboardOverviewPage />, ['/moderator-dashboard']);
+    await screen.findByText('Verification Queue', {}, { timeout: 10000 });
+    expect(await axe(container)).toHaveNoViolations();
+  }, 15000);
+
+  it('UserDashboardOverviewPage has no axe violations', async () => {
+    await signIn('customer1.seed@rentalhunt.test');
+    const { container } = renderWithProviders(<UserDashboardOverviewPage />, ['/user-dashboard']);
+    await screen.findByText('Dashboard', {}, { timeout: 10000 });
+    await waitFor(() => expect(screen.queryByText('Upcoming Viewings')).toBeInTheDocument());
     expect(await axe(container)).toHaveNoViolations();
   }, 15000);
 });
@@ -104,14 +126,14 @@ describe('High-risk screens (forms, dialogs) — axe accessibility', () => {
 
   it('AgentPropertiesPage (table + filters) has no axe violations', async () => {
     await signIn('agent2.seed@rentalhunt.test');
-    const { container } = renderWithProviders(<AgentPropertiesPage />, ['/dashboard/properties']);
+    const { container } = renderWithProviders(<AgentPropertiesPage />, ['/agent-dashboard/properties']);
     await waitFor(() => expect(screen.queryAllByRole('row').length).toBeGreaterThan(1), { timeout: 10000 });
     expect(await axe(container)).toHaveNoViolations();
   }, 15000);
 
   it('AdminVerificationQueuePage has no axe violations', async () => {
     await signIn('moderator1.seed@rentalhunt.test');
-    const { container } = renderWithProviders(<AdminVerificationQueuePage />, ['/admin/verification-queue']);
+    const { container } = renderWithProviders(<AdminVerificationQueuePage />, ['/moderator-dashboard/verification-queue']);
     await screen.findByText('Verification Queue', {}, { timeout: 10000 });
     expect(await axe(container)).toHaveNoViolations();
   }, 15000);

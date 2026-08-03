@@ -92,7 +92,7 @@ function renderDashboard() {
   render(
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <MemoryRouter initialEntries={['/dashboard']}>
+        <MemoryRouter initialEntries={['/agent-dashboard']}>
           <AgentDashboardOverviewPage />
         </MemoryRouter>
       </AuthProvider>
@@ -107,7 +107,10 @@ describe('AgentDashboardOverviewPage (integration, local Supabase)', () => {
     renderDashboard();
 
     expect(await screen.findByText('Dashboard')).toBeInTheDocument();
-    const cards = await screen.findAllByText('0');
+    // No explicit timeout here previously — RTL's 1000ms default, which the
+    // sibling test below already knows to override (10000ms), was too tight
+    // for a real network round-trip against local Supabase under any load.
+    const cards = await screen.findAllByText('0', {}, { timeout: 10000 });
     expect(cards.length).toBeGreaterThanOrEqual(4);
     expect(screen.getByText('Total properties')).toBeInTheDocument();
     expect(screen.getByText('Active listings')).toBeInTheDocument();
