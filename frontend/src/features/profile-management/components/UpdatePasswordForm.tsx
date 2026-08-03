@@ -2,7 +2,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { Alert, AlertDescription, AlertTitle, Button, FieldError, Input, Label } from '@/shared/ui';
+import { Alert, AlertDescription, AlertTitle, Button, FieldError, Label, PasswordInput } from '@/shared/ui';
 import { isAppError } from '@/shared/lib/errors';
 import { useUpdatePassword } from '../hooks/useUpdatePassword';
 import { UpdatePasswordSchema, type UpdatePasswordInput } from '../schemas/updatePassword.schema';
@@ -48,9 +48,8 @@ export function UpdatePasswordForm() {
           Current password <span aria-hidden="true">*</span>
           <span className="sr-only"> (required)</span>
         </Label>
-        <Input
+        <PasswordInput
           id="currentPassword"
-          type="password"
           autoComplete="current-password"
           aria-invalid={!!errors.currentPassword}
           aria-describedby={errors.currentPassword ? 'currentPassword-error' : undefined}
@@ -67,9 +66,8 @@ export function UpdatePasswordForm() {
           New password <span aria-hidden="true">*</span>
           <span className="sr-only"> (required)</span>
         </Label>
-        <Input
+        <PasswordInput
           id="newPassword"
-          type="password"
           autoComplete="new-password"
           aria-invalid={!!errors.newPassword}
           aria-describedby={errors.newPassword ? 'newPassword-error' : undefined}
@@ -86,9 +84,8 @@ export function UpdatePasswordForm() {
           Confirm new password <span aria-hidden="true">*</span>
           <span className="sr-only"> (required)</span>
         </Label>
-        <Input
+        <PasswordInput
           id="confirmNewPassword"
-          type="password"
           autoComplete="new-password"
           aria-invalid={!!errors.confirmNewPassword}
           aria-describedby={errors.confirmNewPassword ? 'confirmNewPassword-error' : undefined}

@@ -3,7 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router';
-import { Alert, AlertDescription, AlertTitle, Button, FieldError, Input, Label } from '@/shared/ui';
+import { Alert, AlertDescription, AlertTitle, Button, FieldError, Input, Label, PasswordInput } from '@/shared/ui';
 import { isAppError } from '@/shared/lib/errors';
 import { PATHS } from '@/shared/config';
 import { useRegister } from '../hooks/useRegister';
@@ -81,9 +81,8 @@ export function RegisterForm() {
           Password <span aria-hidden="true">*</span>
           <span className="sr-only"> (required)</span>
         </Label>
-        <Input
+        <PasswordInput
           id="password"
-          type="password"
           autoComplete="new-password"
           aria-invalid={!!errors.password}
           aria-describedby={errors.password ? 'password-error' : undefined}

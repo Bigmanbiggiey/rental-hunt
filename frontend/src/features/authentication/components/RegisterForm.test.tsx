@@ -37,7 +37,7 @@ describe('RegisterForm (integration, local Supabase)', () => {
 
     await user.type(screen.getByLabelText(/full name/i), 'Test Integration User');
     await user.type(screen.getByLabelText(/email/i), uniqueEmail);
-    await user.type(screen.getByLabelText(/password/i), 'Kilimani2026');
+    await user.type(screen.getByLabelText(/password/i, { selector: 'input' }), 'Kilimani2026');
     await user.click(screen.getByRole('button', { name: /create account/i }));
 
     await waitFor(() => expect(screen.getByText('Home page')).toBeInTheDocument(), {
@@ -65,7 +65,7 @@ describe('RegisterForm (integration, local Supabase)', () => {
 
     await user.type(screen.getByLabelText(/full name/i), 'Bad Password User');
     await user.type(screen.getByLabelText(/email/i), `rtl-badpw-${Date.now()}@example.com`);
-    await user.type(screen.getByLabelText(/password/i), 'short');
+    await user.type(screen.getByLabelText(/password/i, { selector: 'input' }), 'short');
     await user.click(screen.getByRole('button', { name: /create account/i }));
 
     expect(await screen.findByText(/at least 8 characters/i)).toBeInTheDocument();
@@ -80,7 +80,7 @@ describe('RegisterForm (integration, local Supabase)', () => {
     renderRegisterForm();
     await user.type(screen.getByLabelText(/full name/i), 'First User');
     await user.type(screen.getByLabelText(/email/i), duplicateEmail);
-    await user.type(screen.getByLabelText(/password/i), 'Kilimani2026');
+    await user.type(screen.getByLabelText(/password/i, { selector: 'input' }), 'Kilimani2026');
     await user.click(screen.getByRole('button', { name: /create account/i }));
     await waitFor(() => expect(screen.getByText('Home page')).toBeInTheDocument(), {
       timeout: 10000,
@@ -92,7 +92,7 @@ describe('RegisterForm (integration, local Supabase)', () => {
     renderRegisterForm();
     await user.type(screen.getByLabelText(/full name/i), 'Second User');
     await user.type(screen.getByLabelText(/email/i), duplicateEmail);
-    await user.type(screen.getByLabelText(/password/i), 'Kilimani2026');
+    await user.type(screen.getByLabelText(/password/i, { selector: 'input' }), 'Kilimani2026');
     await user.click(screen.getByRole('button', { name: /create account/i }));
 
     expect(

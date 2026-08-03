@@ -3,7 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router';
-import { Alert, AlertDescription, AlertTitle, Button, FieldError, Input, Label } from '@/shared/ui';
+import { Alert, AlertDescription, AlertTitle, Button, FieldError, Label, PasswordInput } from '@/shared/ui';
 import { isAppError } from '@/shared/lib/errors';
 import { PATHS } from '@/shared/config';
 import { useResetPassword } from '../hooks/useResetPassword';
@@ -48,9 +48,8 @@ export function ResetPasswordForm() {
           New password <span aria-hidden="true">*</span>
           <span className="sr-only"> (required)</span>
         </Label>
-        <Input
+        <PasswordInput
           id="newPassword"
-          type="password"
           autoComplete="new-password"
           aria-invalid={!!errors.newPassword}
           aria-describedby={errors.newPassword ? 'newPassword-error' : undefined}
@@ -67,9 +66,8 @@ export function ResetPasswordForm() {
           Confirm new password <span aria-hidden="true">*</span>
           <span className="sr-only"> (required)</span>
         </Label>
-        <Input
+        <PasswordInput
           id="confirmPassword"
-          type="password"
           autoComplete="new-password"
           aria-invalid={!!errors.confirmPassword}
           aria-describedby={errors.confirmPassword ? 'confirmPassword-error' : undefined}
