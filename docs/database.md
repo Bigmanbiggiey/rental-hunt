@@ -791,7 +791,8 @@ end if;
 | `roles` | SELECT (public reference) | SELECT | SELECT | SELECT | SELECT, INSERT/UPDATE/DELETE |
 | `agencies` | SELECT (`is_active = true`) | SELECT | SELECT all; UPDATE own agency's non-critical fields (`description`, `logo_url`, `phone`, `email`) | SELECT all | Full CRUD |
 | `agents` | SELECT (public directory fields via a view) | SELECT | SELECT all; UPDATE own row (`bio`, `job_title`) | SELECT all | Full CRUD |
-| `counties` / `locations` / `property_types` | SELECT | SELECT | SELECT | SELECT | Full CRUD |
+| `counties` / `property_types` | SELECT | SELECT | SELECT | SELECT | Full CRUD |
+| `locations` | SELECT | SELECT | SELECT, **plus INSERT** (`locations_insert_agent`, post-Sprint-8 — the property form's Location field can create a new neighborhood on the fly; UPDATE/DELETE stay admin-only via `locations_manage_admin`) | SELECT | Full CRUD |
 | `properties` | SELECT where `is_archived = false AND deleted_at IS NULL AND verification_status <> 'rejected'` | Same as Guest, **plus** (Sprint 5) any property the customer has favorited or has a `viewing_requests` row for, even if since archived/rejected — `FAV-003`'s "unavailable or archived saved properties are clearly marked" requires seeing them, not just knowing they're gone | SELECT all rows for own `agency_id`; INSERT/UPDATE (except verification columns, see above) scoped to own agency | SELECT all; UPDATE limited to verification via RPC | Full CRUD |
 | `property_images` | SELECT (parent property visible per rule above) | Same as Guest | INSERT/UPDATE/DELETE for own agency's properties | SELECT all | Full CRUD |
 | `amenities` | SELECT | SELECT | SELECT | SELECT | Full CRUD |
@@ -870,6 +871,8 @@ All three buckets enforce file-type and size limits at the Supabase Storage poli
 
 **Implementation status (Sprint 7, `20260731090000_administration.sql`):** the five DB-trigger-based rows below (`property.created`/`updated`/`availability_changed`, `viewing.booked`/`status_changed`, `user.registered`) are all built — `log_property_activity()` (`AFTER INSERT OR UPDATE` on `properties`), `log_viewing_request_activity()` (`AFTER INSERT OR UPDATE` on `viewing_requests`), `log_profile_registration()` (`AFTER INSERT` on `profiles`), each `security definer`. `property.updated` only fires on a real delta to `title`/`description`/`rent_amount`/`deposit_amount`/`bedrooms`/`bathrooms` (`row(...) is distinct from row(...)`) — never on a bare `view_count` bump or a verification-column change, both already covered elsewhere (the former is a fire-and-forget increment with no audit value; the latter is `property_verifications`' job, per the row below). `user.login` remains **not built** — still correctly scoped to Sprint 7 (it needs an application-layer call from the auth Service, not a DB trigger) but not part of this sprint's actual DoD (verification queue, user/agency management, activity-log viewing), deliberately deferred as its own follow-up rather than bundled in.
 
+**Two further event types added post-Sprint-8 (2026-08-04), application-layer not trigger-based:** `user.invited` and `user.deleted`, both written directly by the new `admin-invite-user`/`admin-delete-user` Edge Functions (`api-design.md` §12) using their own `service_role` client — not a DB trigger, since both actions originate outside a normal RLS-scoped request in the first place. `entity_type: 'profile'`, `entity_id` the affected user's id (still meaningful for `user.deleted` even though the row itself no longer exists — `activity_logs.entity_id` has no FK constraint, deliberately, since it's a polymorphic log reference).
+
 ## Tracked Events (MVP)
 
 | `action` | Trigger point | `entity_type` | Notes |
@@ -882,6 +885,8 @@ All three buckets enforce file-type and size limits at the Supabase Storage poli
 | `viewing.status_changed` | `AFTER UPDATE` on `viewing_requests` when `status` changes | `viewing_request` | Covers confirm, reschedule, cancel, complete, no-show in one event shape. |
 | `user.registered` | `AFTER INSERT` on `profiles` (via the signup trigger) | `profile` | |
 | `user.login` | Application-layer RPC call after a successful Supabase Auth sign-in | `profile` | **Not** a DB trigger — Supabase Auth's sign-in flow does not fire a `public`-schema table write, so this must be logged from the service layer immediately after authentication succeeds. Documented here as an implementation requirement, not a trigger. |
+| `user.invited` | Inside the `admin-invite-user` Edge Function, after a successful `auth.admin.inviteUserByEmail()` | `profile` | Built post-Sprint-8. `metadata`: `{ email, role }`. Not a DB trigger — same reasoning as `user.login`, plus the insert itself is written by the function's own `service_role` client. |
+| `user.deleted` | Inside the `admin-delete-user` Edge Function, after a successful `auth.admin.deleteUser()` | `profile` | Built post-Sprint-8. Logged *after* the delete succeeds (not before), so a blocked or failed delete attempt never produces a misleading log entry. |
 
 ## Future Extensibility
 
@@ -897,9 +902,9 @@ Recommended seed data for local development (`supabase/seed.sql`), kept intentio
 
 **Property Types** (`property_types`): Apartment, Bedsitter, Studio, Townhouse, Maisonette, Bungalow, Villa, Commercial.
 
-**Counties** (`counties`): Nairobi, Kiambu, Kajiado, Machakos — the Nairobi metro area the MVP targets. Production seeding should include all 47 counties for future expansion, but local dev only needs enough variety to exercise filtering.
+**Counties** (`counties`): all 47 Kenyan counties (post-Sprint-8, `20260804100000_counties_and_agent_location_creation.sql` — Nairobi/Kiambu/Kajiado/Machakos were already seeded by `property_discovery.sql`; the remaining 43 were added in this later, idempotent migration once the property form's County field needed to offer every real county, not just the Nairobi-metro MVP subset).
 
-**Locations** (`locations`, scoped to Nairobi): Kilimani, Westlands, Karen, Lavington, Kileleshwa, South B, South C, Embakasi, Langata, Ngong Road.
+**Locations** (`locations`, scoped to Nairobi): Kilimani, Westlands, Karen, Lavington, Kileleshwa, South B, South C, Embakasi, Langata, Ngong Road. Deliberately not pre-seeded for the other 46 counties, unlike `counties` itself above — exhaustively pre-populating every real Kenyan neighborhood isn't practical, so instead an agent can add a new `locations` row directly from the property form when their county's neighborhood isn't listed yet (`locations_insert_agent`, Policy Summary above).
 
 **Amenities** (`amenities`): Parking, Borehole/Water Backup, Security/Gated Community, WiFi, Balcony, Furnished, Pets Allowed, Swimming Pool, Backup Generator, Gym — covers the required list in FR-PROP-012 plus a few realistic extras.
 

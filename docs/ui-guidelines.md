@@ -351,13 +351,21 @@ Same states/accessibility pattern as Input. Used for property descriptions, view
 
 ## 11.4 Select
 
-**Purpose:** Choose one value from a bounded list (county, property type, sort order).
-
-**Variants:** `default`, `with-search` (for long lists like `locations`/neighborhoods).
+**Purpose:** Choose one value from a short, bounded list where scrolling to find an option is reasonable (property type, availability status, sort order — typically under a dozen items).
 
 **States:** closed, open, focus, disabled, error.
 
 **Accessibility:** Built on Radix `Select`, which provides full keyboard support (arrow keys, type-ahead, `Esc` to close) and correct `aria-expanded`/`role="listbox"` semantics out of the box — no custom keyboard handling should be written.
+
+## 11.4.1 Combobox (searchable Select)
+
+**Purpose:** The `with-search` variant this section originally anticipated for "long lists like `locations`/neighborhoods" — implemented post-Sprint-8 as its own component (`shared/ui/combobox.tsx`, Popover + `cmdk`'s Command) rather than a `Select` variant, since Radix `Select` has no built-in filtering to extend. Used for county (47 options) and location/neighborhood (open-ended, agent-extensible) in the property form; a plain `Select` stays correct for genuinely short lists like property type.
+
+**Create-new affordance:** When a field's own list of choices is meant to grow (currently only Location), typing a name with no existing match shows an inline "Create '<query>'" option instead of a dead-end empty state — the actual creation and its authorization live in the calling feature (`agent-properties`), not the shared component itself.
+
+**States:** closed, open (with a search input focused), focus, disabled, error, no-results (with or without a create option, depending on whether the field was given one).
+
+**Accessibility:** The trigger is a real `role="combobox"` button labelled the same way a `Select` trigger is (`<Label htmlFor>` pointing at its `id`); the popover's list uses `cmdk`'s own `role="option"` items and arrow-key/type-ahead handling — no custom keyboard handling written here either.
 
 ## 11.5 Checkbox
 
@@ -562,6 +570,14 @@ Maps `properties.verification_status` (`database.md` §6):
 **Purpose:** Show property location via Leaflet + OpenStreetMap (`PROP-006`, `architecture.md` §14).
 
 **Behavior:** A fixed-height (`320px` mobile, `400px` desktop) map, single marker at the property's `latitude`/`longitude`, with a visible "Get Directions" button that opens the platform's default external maps app — never an embedded routing UI. The map loads lazily (not blocking the rest of the page) and shows a Skeleton until Leaflet initializes.
+
+## 12.11.1 Location Picker (property form)
+
+**Purpose:** Let an agent set a listing's exact `latitude`/`longitude` visually (post-Sprint-8) instead of only typing raw coordinates — same Leaflet/OpenStreetMap stack as §12.11's read-only map, no new mapping dependency.
+
+**Behavior:** A search box (Nominatim/OpenStreetMap geocoding, `countrycodes=ke`) above a `256px`–`320px` map. Typing a place and submitting shows up to 5 candidate results to choose from — never auto-selects the first, since geocoding for informal/local Kenyan addressing is often ambiguous. Clicking anywhere on the map itself also places (or moves) a draggable marker directly. Either path writes straight into the same `latitude`/`longitude` fields the manual number inputs below the map already control — both stay live and editable, so an agent can fine-tune a picked point by typing an exact value, or override the map entirely by typing coordinates with no map interaction at all. No coordinate is ever silently applied without a fields update the agent can see and correct.
+
+**Default view:** if the listing already has coordinates (edit mode), centers there; otherwise fits the whole of Kenya's bounding box rather than guessing a default city, since an agent could be listing anywhere in the country.
 
 ## 12.12 Favorite Button
 

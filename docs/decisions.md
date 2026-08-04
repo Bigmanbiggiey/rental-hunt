@@ -902,6 +902,30 @@ Old URLs are removed outright rather than redirected, per explicit developer dec
 
 ---
 
+## ADR-032: Admin user Create/Delete via two new Edge Functions — invite-by-email, and hard-delete only when the account is genuinely empty
+
+**Status:** Accepted
+**Date:** 2026-08-04
+
+**Decision:** Extend "Manage Users" (`api-design.md` §9, previously `list()`/`adminUpdate()` only) with two admin-only operations, each its own Edge Function — the first Edge Functions actually built in this project (`api-design.md` §12 had five sketched, all webhook/schedule-triggered; none built, none directly invoked):
+
+- **Create → `admin-invite-user`.** Calls Supabase's `auth.admin.inviteUserByEmail()`, which creates the `auth.users` row, fires the existing `handle_new_user` trigger, and sends a real invite email the recipient completes themselves. The admin never sets or sees a password.
+- **Delete → `admin-delete-user`.** Calls `auth.admin.deleteUser()`, but only after confirming the target account has no `properties`/`viewing_requests`/`property_verifications` rows — all `on delete restrict` (`database.md` §5.6/§5.14/§5.15) specifically so real listing/booking/review history can never be silently orphaned — **plus** `properties.verified_by`, which is `on delete set null` (not `restrict`) but found via real manual testing to still be blocked by `enforce_verification_authority()`'s trigger guard even on a system-initiated cascade write, not just a direct client update. Any account with real history is refused with a specific `USER_HAS_ACTIVITY` error (and a breakdown of what's blocking it) rather than a raw Postgres error, and is expected to use the existing `adminUpdate({ isActive: false })` deactivate path instead.
+
+**Context:** Neither operation can go through a Repository + RLS the way every other write in this project does — both need to create/delete rows in Postgres's `auth` schema, which RLS cannot reach and which requires `service_role`, a key this project has held out of the frontend since Sprint 1 (`architecture.md`, `coding-standards.md` §21). `api-design.md` §12 already carried the exact decision test this falls under ("needs a secret → Edge Function") and already named the direct-invoke shape as the "rare manual admin action" case — this is the first time that case actually happened.
+
+Two real product questions were resolved with the developer before building, not assumed: (1) whether Create sets a temp password directly or sends an invite — invite chosen, standard practice, avoids the admin ever handling a password; (2) whether Delete always attempts a hard delete (failing loudly on any account with history) or is scoped to only work on empty accounts — the latter chosen, since the FK constraints make "any account with real history" the *common* case, not an edge case, for anything past its first day.
+
+**Rationale:** Both functions independently re-verify the caller is a current admin before doing anything privileged (`supabase/functions/_shared/adminAuth.ts`, shared by both) — `service_role` bypasses RLS entirely, so unlike a normal Repository call, the function itself has to be the authorization boundary, the same posture `set_property_verification()`'s own role check already established for RPC-level privilege bypass (ADR-029's neighbor precedent, different mechanism). The empty-account check runs *before* attempting the delete rather than letting the Admin API call fail and translating a generic error afterward — proactive, specific, matches how `prevent_booking_unavailable_property()`'s dedicated `RH001` errcode was chosen over letting a generic constraint violation surface (Sprint 5 precedent, same instinct).
+
+**Consequences:** This project now has real Edge Function infrastructure (`supabase/functions/`, a `_shared/` folder, local testing via `supabase functions serve`) where none existed before — the next Edge Function (any of §12's five sketched ones, or a future one) has a real pattern to follow, not just a documented intention. `activity_logs` gains two new, application-layer-written (not trigger-written) event types, `user.invited`/`user.deleted` (`database.md`, Tracked Events table) — the third instance of that pattern after `user.login`'s already-documented "not a DB trigger" case.
+
+**A real bug was found and fixed during this feature's own manual verification, not by inspection:** the first live test against a real seeded agent recorded as `verified_by` on 7 properties returned an opaque `500` instead of the intended `409` — the empty-account check (as first written) only covered the four `restrict` constraints, missing `properties.verified_by` entirely since it's `set null`, not `restrict`, and so looked safe by the FK schema alone. `enforce_verification_authority()`'s trigger guard turned out to still block that column's value from changing even via a cascaded system write, not just a direct client update — a real, non-obvious interaction between two independently-reasonable pieces of database design (a permissive FK action, and a strict trigger) that only real testing against real seeded data surfaced. Fixed by adding a fifth blocker check; a regression test (`hasBlockingActivity` with only `verifiedProperties` nonzero) now covers it directly.
+
+**Related Documents:** `api-design.md` §9/§12, `database.md` §5.6/§5.14/§5.15 (the `on delete restrict` constraints this design is built around) and its Tracked Events table, `coding-standards.md` §21 (`service_role` never reaching the frontend), ADR-029 (the RPC-level precedent for an Edge-Function-level authorization re-check).
+
+---
+
 # Future ADR Process
 
 | Aspect | Rule |

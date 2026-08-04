@@ -750,7 +750,7 @@ All routes below require `moderator` or `admin` (verification/viewing oversight)
 |---|---|---|---|---|
 | Dashboard Metrics | `GET /admin/metrics` | `adminMetricsRepository.getMetrics()` (`features/admin-dashboard`) | Admin | Platform-wide counts: total properties, pending verifications, active agencies, bookings in the last 7 days. |
 | Manage Properties | `GET /admin/properties`, `PATCH /admin/properties/:id` | `propertyRepository.list({ scope: 'all' })`, `.update()` | Admin | **Not built (Sprint 7) — deliberately out of scope, see status note above.** Bypasses the public visibility filter (§4); can force-archive any listing, whenever a future sprint adds this screen. |
-| Manage Users | `GET /admin/users`, `PATCH /admin/users/:id` | `adminUserRepository.list()`, `.adminUpdate(id, { role?, isActive? })` (`features/admin-users`) | Admin | The only path that can change `profiles.role` (bypasses the self-role-change trigger, `database.md` §9). Feature-local, not an extension of `profileRepository` — no other consumer needs `list()`/`adminUpdate()` (ADR-030). |
+| Manage Users | `GET /admin/users`, `PATCH /admin/users/:id`, `POST admin-invite-user`, `POST admin-delete-user` | `adminUserRepository.list()`, `.adminUpdate(id, { role?, isActive?, fullName?, phone? })`, `.invite({ email, fullName, role })`, `.deleteUser(id)` (`features/admin-users`) | Admin | The only path that can change `profiles.role` (bypasses the self-role-change trigger, `database.md` §9). `adminUpdate` covers every plain `profiles` column (role/status already existed; `fullName`/`phone` added post-Sprint-8, 2026-08-04 — no new access path, `profiles_update_all_admin` already grants it). `invite`/`deleteUser` (post-Sprint-8) both go through a dedicated Edge Function instead — the only two Manage Users operations that touch `auth.users`, which RLS can never reach regardless of role. Feature-local, not an extension of `profileRepository` — no other consumer needs any of these (ADR-030, ADR-032). |
 | Manage Agencies | `GET /admin/agencies`, `POST /admin/agencies`, `PATCH /admin/agencies/:id` | `agencyRepository.list()`, `.getById(id)`, `.create()`, `.update()` (`entities/agency`) | Admin | Agency onboarding is admin-driven in the MVP (`FUT-002` self-service onboarding is deferred). `getById` is a Sprint 7 extension to the §13 contract below — the admin edit form needs to fetch a single agency to prefill, and `list()`'s `Agency[]` shape has no id-scoped variant. No agency-logo upload UI — `logoUrl` is a plain optional text field (the DoD says "create a new agency," not "upload a logo"; `database.md` §10's `agency-logos` bucket remains unbuilt). |
 | Verification Queue | `GET /admin/properties/pending-verification` | `verificationRepository.listPending()` (`entities/property-verification`) | Moderator, Admin | Filters `properties.verification_status = 'pending_verification'`, ordered oldest-first (a fair review queue). |
 | Verification Action | see §6.9 | `verificationRepository.setStatus()` (`entities/property-verification`) | Moderator, Admin | Same RPC as the Agent Dashboard's verification screen. |
@@ -829,13 +829,15 @@ flowchart TD
 
 | Edge Function | Trigger | Purpose |
 |---|---|---|
+| `admin-invite-user` **(built, post-Sprint-8)** | Direct invoke — `adminUserRepository.invite()` | The first Edge Functions actually built in this project, and the "rare manual admin action" case this section's closing paragraph already anticipated. Verifies the caller is a current admin (RLS can't help — `service_role` bypasses it entirely), then calls `auth.admin.inviteUserByEmail()`. Needs `SUPABASE_SERVICE_ROLE_KEY`, never reachable from the frontend. |
+| `admin-delete-user` **(built, post-Sprint-8)** | Direct invoke — `adminUserRepository.deleteUser()` | Same admin check, then checks for any owned `properties`/`viewing_requests`/`property_verifications` rows (all `on delete restrict`) *and* any property where they're recorded as `verified_by` (`on delete set null`, but still blocked by `enforce_verification_authority()`'s trigger even on a cascaded write — found via real testing, not inspection) before calling `auth.admin.deleteUser()` — returns `USER_HAS_ACTIVITY` instead of a raw error when blocked. See ADR-032 for why hard-delete is scoped this narrowly. |
 | `send-booking-notifications` | Database webhook on `viewing_requests` insert/update | Sends email (and future SMS) to the customer/agent on booking creation and every status change — requires an email provider secret key, which must never reach the client. |
 | `verification-workflow` | Database webhook on `property_verifications` insert | Notifies the affected agent when a listing is verified/rejected; future extension point for auto-flagging listings that have sat in `pending_verification` too long. |
 | `daily-analytics` | Scheduled (`pg_cron` or Supabase Scheduled Functions, daily) | Aggregates `view_count` and viewing-request volume into a summary the Admin Analytics screen (§9) reads, instead of computing heavy aggregates on every dashboard load. |
 | `scheduled-cleanup` | Scheduled, weekly | Purges/archives `activity_logs` rows past the retention window (`database.md` §11) and flags properties that have been `pending_verification` for an unreasonable time. |
 | `process-property-image` | Storage webhook on upload to `property-images` | Optional MVP-nice-to-have: generates a compressed/resized variant so the client never uploads (or the app never serves) an unnecessarily large original — supports `SYS-004`. |
 
-None of these are called directly by the frontend; they react to database/storage webhooks or a schedule. Where a Service does need to *invoke* one directly (rare — e.g. a manual "resend notification" admin action), it goes through `supabase.functions.invoke(name, { body })`, still behind a Repository method, never called from a component.
+Everything below `admin-invite-user`/`admin-delete-user` above reacts to database/storage webhooks or a schedule, none called directly by the frontend. Where a Service does need to *invoke* one directly (rare — e.g. a manual "resend notification" admin action, or the two built above), it goes through `supabase.functions.invoke(name, { body })`, still behind a Repository method, never called from a component. Both built functions live in `supabase/functions/`, with shared auth/CORS helpers in `supabase/functions/_shared/` — tested per this section's own testing table below (Deno's test runner for the pure validation logic; `supabase functions serve` + a real manual pass for the actual authorization/Admin-API behavior, the same "prove it against a real session" standard this project applies to every other privilege-bypassing operation).
 
 ---
 
@@ -870,6 +872,15 @@ interface PropertyRepository {
   submitForVerification(id: string): Promise<Property>; // Sprint 6, AGENT-007's agent-facing half — §6.10
 }
 // Errors: VALIDATION_ERROR, PROPERTY_NOT_FOUND, FORBIDDEN, INVALID_STATE_TRANSITION, STORAGE_ERROR
+
+interface ReferenceDataRepository { // never previously documented here — added post-Sprint-8 alongside its first contract change (createLocation)
+  listCounties(): Promise<County[]>;
+  listLocations(countyId?: string): Promise<Location[]>;
+  listPropertyTypes(): Promise<PropertyType[]>;
+  listAmenities(): Promise<Amenity[]>;
+  createLocation(countyId: string, name: string): Promise<Location>; // post-Sprint-8 — agent-only (locations_insert_agent, database.md §9); the property form's Location combobox calls this when no existing neighborhood matches what was typed
+}
+// Errors: VALIDATION_ERROR, FORBIDDEN, CONFLICT (duplicate (countyId, name) — 23505, mapSupabaseError.ts §15.3)
 
 interface PropertyImageRepository {
   listByProperty(propertyId: string): Promise<PropertyImage[]>;
