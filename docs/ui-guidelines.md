@@ -669,6 +669,14 @@ See §19 for the full standard applied to dashboard contexts (no properties yet,
 
 See §18 for timing rules; dashboards specifically use Skeleton table rows (matching real row height/column structure) rather than a centered spinner, so the layout doesn't jump when data arrives.
 
+## 13.12 Customer Dashboard Welcome Block
+
+**Purpose:** Fix a real gap (post-Sprint-8, 2026-08-04) — `/user-dashboard`'s only content was two booking sections, both legitimately empty for any brand-new customer, with no welcome or explanation of the site. `HomePage`'s hero (§ SearchHero) already serves this purpose for a guest; this is the equivalent for the moment right after login.
+
+**Anatomy:** A `bg-accent` rounded section above the existing Upcoming/Completed Viewings sections — `branding.md`'s Tagline as the page's `<h1>`, a one-line description, a 3-item "how it works" row (Search → Compare → Book a Viewing, icon + label + short description each), a primary "Browse Properties" button (→ `/properties`), and the same static/qualitative trust-indicator chips `SearchHero` already established on the public homepage (icon + short label, e.g. "Verified Listings," "Legitimate Agents") — not per-listing claims, which §1's "trust is shown, not claimed" governs separately.
+
+**Behavior:** Always visible, on every visit, regardless of whether the customer has real booking history — a deliberate developer decision over hiding it once activity exists, so it doubles as a standing reminder of how the platform works rather than a one-time first-run state. The existing bookings sections render unchanged below it; heading hierarchy nests correctly under the new `<h1>` (`<h2>` "Your Bookings" → `<h3>` per section).
+
 ---
 
 # 14. Forms
