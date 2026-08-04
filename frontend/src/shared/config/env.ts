@@ -1,6 +1,7 @@
 interface Env {
   readonly supabaseUrl: string;
   readonly supabaseAnonKey: string;
+  readonly isDev: boolean;
 }
 
 function loadEnv(): Env {
@@ -20,7 +21,7 @@ function loadEnv(): Env {
     );
   }
 
-  return { supabaseUrl, supabaseAnonKey };
+  return { supabaseUrl, supabaseAnonKey, isDev: import.meta.env.DEV };
 }
 
 /**
