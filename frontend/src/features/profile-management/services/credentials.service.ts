@@ -20,4 +20,8 @@ export const credentialsService = {
       newPassword: parsed.newPassword,
     });
   },
+
+  async signOutOtherDevices(): Promise<void> {
+    return credentialsRepository.signOutOtherDevices();
+  },
 };

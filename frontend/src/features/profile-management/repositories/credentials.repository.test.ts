@@ -3,6 +3,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 const mockGetUser = vi.fn();
 const mockUpdateUser = vi.fn();
 const mockSignInWithPassword = vi.fn();
+const mockSignOut = vi.fn();
 
 vi.mock('@/shared/lib/supabase', () => ({
   supabase: {
@@ -10,6 +11,7 @@ vi.mock('@/shared/lib/supabase', () => ({
       getUser: mockGetUser,
       updateUser: mockUpdateUser,
       signInWithPassword: mockSignInWithPassword,
+      signOut: mockSignOut,
     },
   },
 }));
@@ -20,6 +22,7 @@ beforeEach(() => {
   mockGetUser.mockReset();
   mockUpdateUser.mockReset();
   mockSignInWithPassword.mockReset();
+  mockSignOut.mockReset();
 });
 
 describe('credentialsRepository (unit, fake Supabase client)', () => {
@@ -110,6 +113,26 @@ describe('credentialsRepository (unit, fake Supabase client)', () => {
         credentialsRepository.updatePassword({ currentPassword: 'x', newPassword: 'newPass2' }),
       ).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
       expect(mockSignInWithPassword).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('signOutOtherDevices', () => {
+    it('calls supabase.auth.signOut with scope "others", not "global"', async () => {
+      mockSignOut.mockResolvedValueOnce({ error: null });
+
+      await credentialsRepository.signOutOtherDevices();
+
+      expect(mockSignOut).toHaveBeenCalledWith({ scope: 'others' });
+    });
+
+    it('normalizes a Supabase Auth error via the shared error mapper', async () => {
+      mockSignOut.mockResolvedValueOnce({
+        error: { code: 'session_not_found', message: 'no session' },
+      });
+
+      await expect(credentialsRepository.signOutOtherDevices()).rejects.toMatchObject({
+        code: 'UNAUTHENTICATED',
+      });
     });
   });
 });

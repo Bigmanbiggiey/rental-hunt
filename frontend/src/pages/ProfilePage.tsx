@@ -1,5 +1,6 @@
 import {
   NotificationPreferencesForm,
+  SignOutOtherDevicesSection,
   UpdateEmailForm,
   UpdatePasswordForm,
   UpdateProfileForm,
@@ -21,6 +22,8 @@ function ProfilePage() {
       <UpdateEmailForm />
       <hr className="border-border" />
       <UpdatePasswordForm />
+      <hr className="border-border" />
+      <SignOutOtherDevicesSection />
     </div>
   );
 }

@@ -5,6 +5,8 @@ export interface CredentialsRepository {
   getCurrentEmail(): Promise<string | null>;
   updateEmail(newEmail: string): Promise<void>;
   updatePassword(input: { currentPassword: string; newPassword: string }): Promise<void>;
+  /** Revokes every refresh token for this account except the one behind the current session — `scope: 'others'`, not `'global'`, so triggering this doesn't also sign the caller out of the page they clicked it from. */
+  signOutOtherDevices(): Promise<void>;
 }
 
 export const credentialsRepository: CredentialsRepository = {
@@ -39,5 +41,10 @@ export const credentialsRepository: CredentialsRepository = {
 
     const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
     if (updateError) throw mapSupabaseError(updateError);
+  },
+
+  async signOutOtherDevices() {
+    const { error } = await supabase.auth.signOut({ scope: 'others' });
+    if (error) throw mapSupabaseError(error);
   },
 };
