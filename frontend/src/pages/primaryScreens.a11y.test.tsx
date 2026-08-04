@@ -105,7 +105,10 @@ describe('Primary screens — axe accessibility (WCAG 2.2 AA)', () => {
   it('UserDashboardOverviewPage has no axe violations', async () => {
     await signIn('customer1.seed@rentalhunt.test');
     const { container } = renderWithProviders(<UserDashboardOverviewPage />, ['/user-dashboard']);
-    await screen.findByText('Dashboard', {}, { timeout: 10000 });
+    // Post-Sprint-8 (2026-08-04): the page's old literal "Dashboard" h1 was
+    // replaced by the welcome block's tagline heading — wait for that
+    // instead, not the removed text.
+    await screen.findByText(/find your next home with confidence/i, {}, { timeout: 10000 });
     await waitFor(() => expect(screen.queryByText('Upcoming Viewings')).toBeInTheDocument());
     expect(await axe(container)).toHaveNoViolations();
   }, 15000);
