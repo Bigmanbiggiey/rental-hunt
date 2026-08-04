@@ -69,6 +69,9 @@ const AdminOverviewPage = lazy(() =>
 const AdminVerificationQueuePage = lazy(() =>
   import('@/pages/AdminVerificationQueuePage').then((m) => ({ default: m.AdminVerificationQueuePage })),
 );
+const AdminVerificationReviewPage = lazy(() =>
+  import('@/pages/AdminVerificationReviewPage').then((m) => ({ default: m.AdminVerificationReviewPage })),
+);
 const AdminUsersPage = lazy(() =>
   import('@/pages/AdminUsersPage').then((m) => ({ default: m.AdminUsersPage })),
 );
@@ -156,6 +159,7 @@ export const routeConfig: RouteObject[] = [
         children: [
           { path: PATHS.adminDashboard.root, element: <AdminOverviewPage /> },
           { path: PATHS.adminDashboard.verificationQueue, element: <AdminVerificationQueuePage /> },
+          { path: PATHS.adminDashboard.verificationReview, element: <AdminVerificationReviewPage /> },
           { path: PATHS.adminDashboard.users, element: <AdminUsersPage /> },
           { path: PATHS.adminDashboard.agencies, element: <AdminAgenciesPage /> },
           { path: PATHS.adminDashboard.analytics, element: <AdminAnalyticsPage /> },
@@ -178,6 +182,7 @@ export const routeConfig: RouteObject[] = [
           // Same page components admin uses (RLS already scopes what a
           // moderator can see/do — no separate moderator-only data layer).
           { path: PATHS.moderatorDashboard.verificationQueue, element: <AdminVerificationQueuePage /> },
+          { path: PATHS.moderatorDashboard.verificationReview, element: <AdminVerificationReviewPage /> },
           { path: PATHS.moderatorDashboard.activityLogs, element: <AdminActivityLogPage /> },
         ],
       },

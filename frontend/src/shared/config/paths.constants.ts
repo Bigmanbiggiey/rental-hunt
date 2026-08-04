@@ -24,6 +24,7 @@ export const PATHS = {
   adminDashboard: {
     root: '/admin-dashboard',
     verificationQueue: '/admin-dashboard/verification-queue',
+    verificationReview: '/admin-dashboard/verification-queue/:id',
     users: '/admin-dashboard/users',
     agencies: '/admin-dashboard/agencies',
     analytics: '/admin-dashboard/analytics',
@@ -36,6 +37,7 @@ export const PATHS = {
   moderatorDashboard: {
     root: '/moderator-dashboard',
     verificationQueue: '/moderator-dashboard/verification-queue',
+    verificationReview: '/moderator-dashboard/verification-queue/:id',
     activityLogs: '/moderator-dashboard/activity-logs',
   },
   agentDashboard: {

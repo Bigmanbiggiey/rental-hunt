@@ -1,30 +1,41 @@
 import { useState } from 'react';
 import { ShieldAlert } from 'lucide-react';
-import { toast } from 'sonner';
-import {
-  VerificationActionDialog,
-  VerificationQueueTable,
-  useSetVerificationStatus,
-  useVerificationQueue,
-} from '@/features/admin-verification';
+import { useLocation, useNavigate } from 'react-router';
+import { VerificationQueueTable, useVerificationQueue } from '@/features/admin-verification';
 import type { Property } from '@/entities/property';
-import { isAppError } from '@/shared/lib/errors';
 import { Alert, AlertDescription, Button, EmptyState, Skeleton } from '@/shared/ui';
+import { PATHS } from '@/shared/config';
 
 const PAGE_SIZE = 20;
 
 /**
  * roadmap.md §11's core DoD: "a moderator can review a pending listing,
- * verify or reject it with a reason." Realtime for the reviewer's own view
+ * verify or reject it with a reason." "Review" navigates to
+ * `AdminVerificationReviewPage` (full listing details + the approve/reject
+ * action bar) rather than opening a dialog here — the point of verification
+ * is confirming what the agent entered is accurate, which needs the whole
+ * listing visible, not just a title. Realtime for the reviewer's own view
  * isn't needed here (they're the one taking the action, not waiting on
- * someone else's) — the mutation's own `onSuccess` invalidation is enough;
- * `useAgentPropertyVerificationRealtime` is what covers the *agent's* side.
+ * someone else's) — the review page's own mutation `onSuccess` invalidation
+ * is enough; `useAgentPropertyVerificationRealtime` is what covers the
+ * *agent's* side.
  */
 function AdminVerificationQueuePage() {
   const [page, setPage] = useState(1);
-  const [reviewing, setReviewing] = useState<Property | null>(null);
+  const navigate = useNavigate();
+  const location = useLocation();
   const { data, isLoading, isError } = useVerificationQueue(page, PAGE_SIZE);
-  const { mutate, isPending } = useSetVerificationStatus();
+
+  const reviewProperty = (property: Property) => {
+    // Works for both the admin and moderator route groups (this page is
+    // mounted at both, per AdminVerificationReviewPage's own note) — swap
+    // just the trailing `verification-queue` segment for the current
+    // location's own prefix rather than hardcoding one PATHS constant.
+    const basePath = location.pathname.startsWith('/moderator-dashboard')
+      ? PATHS.moderatorDashboard.verificationQueue
+      : PATHS.adminDashboard.verificationQueue;
+    navigate(`${basePath}/${property.id}`);
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -50,7 +61,7 @@ function AdminVerificationQueuePage() {
 
       {data && data.data.length > 0 && (
         <>
-          <VerificationQueueTable properties={data.data} onReview={setReviewing} />
+          <VerificationQueueTable properties={data.data} onReview={reviewProperty} />
 
           {data.meta.totalPages > 1 && (
             <div className="mx-auto flex items-center gap-4">
@@ -71,29 +82,6 @@ function AdminVerificationQueuePage() {
           )}
         </>
       )}
-
-      <VerificationActionDialog
-        property={reviewing}
-        isPending={isPending}
-        onOpenChange={(open) => {
-          if (!open) setReviewing(null);
-        }}
-        onSubmit={(input) => {
-          if (!reviewing) return;
-          mutate(
-            { propertyId: reviewing.id, input },
-            {
-              onSuccess: () => {
-                toast.success(input.status === 'verified' ? 'Listing approved.' : 'Listing rejected.');
-                setReviewing(null);
-              },
-              onError: (error) => {
-                toast.error(isAppError(error) ? error.message : 'Something went wrong.');
-              },
-            },
-          );
-        }}
-      />
     </div>
   );
 }

@@ -19,6 +19,7 @@ export function useSetVerificationStatus() {
       adminVerificationService.setStatus(propertyId, input),
     onSuccess: (_result, { propertyId }) => {
       void queryClient.invalidateQueries({ queryKey: ['properties', 'verification', 'pending'] });
+      void queryClient.invalidateQueries({ queryKey: ['properties', 'verification', 'detail', propertyId] });
       void queryClient.invalidateQueries({ queryKey: ['properties', 'verification', 'history', propertyId] });
       void queryClient.invalidateQueries({ queryKey: ['properties', 'agent'] });
       void queryClient.invalidateQueries({ queryKey: ['adminMetrics'] });
