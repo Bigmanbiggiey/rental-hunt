@@ -429,6 +429,19 @@ Backed entirely by Supabase Auth (`architecture.md` §7) plus the `profiles` tab
 | **Possible Errors** | `VALIDATION_ERROR`, `INVALID_CREDENTIALS` (current password is wrong), `UNAUTHENTICATED` |
 | **Authorization** | Signed-in user only, re-confirmed via the `signInWithPassword` step above. |
 
+## 5.11 Sign Out of Other Devices
+
+| | |
+|---|---|
+| **Purpose** | Session-management hardening (post-Sprint-8, 2026-08-04, ADR-033) — revoke every other active session for this account (e.g. a device the user no longer trusts or forgot to sign out of), without also signing out the device they're using to trigger it. |
+| **Repository Function** | `credentialsRepository.signOutOtherDevices(): Promise<void>` |
+| **Underlying call** | `supabase.auth.signOut({ scope: 'others' })` — deliberately not `scope: 'global'`, which would also end the caller's own current session. |
+| **Request** | none |
+| **Response** | `{ success: true }` |
+| **Validation** | none — no input. |
+| **Possible Errors** | `UNAUTHENTICATED` |
+| **Authorization** | Signed-in user only, acting on their own sessions — there is no `id` parameter, `scope: 'others'` is always relative to the caller's own current session. |
+
 ---
 
 # 6. Property API

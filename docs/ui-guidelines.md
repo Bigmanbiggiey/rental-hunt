@@ -474,6 +474,12 @@ Two distinct patterns (see `database.md` §14 for the underlying rationale):
 
 **Rules:** Auto-dismiss after 4s (success/info) or require manual dismissal (errors); announced via `aria-live="polite"` (errors: `"assertive"`); never used for information the user must act on immediately — that's an Alert or Dialog's job.
 
+## 11.21 Session Management (post-Sprint-8, ADR-033)
+
+**Sessions section (Account settings/`ProfilePage`):** A "Sessions" block below Update Password — a short explanation ("If you think your account is signed in somewhere it shouldn't be...") plus a single `variant="outline"` button, "Sign out of all other devices." Clicking opens a confirm Dialog (§11.10-style pattern — a real, immediate action against sessions the user can't individually see or undo from here) stating plainly that this device stays signed in; confirming calls `signOutOtherDevices()` and closes the dialog on success.
+
+**Idle-timeout warning (admin/moderator only):** A `Dialog`, not a Toast — this needs an explicit decision ("Stay signed in"), not a passive notification. Title "You've been inactive"; body states the exact remaining seconds, updating live, and *why* ("...to protect your account"), not just the countdown. Single primary action, no destructive-styled button (leaving is the passive default, not a choice being warned against). Fires automatically at 14 minutes idle (1-minute warning before the 15-minute sign-out), any tracked activity — including just moving the mouse while the dialog is open — dismisses it and resets the clock.
+
 ---
 
 # 12. Property Components
