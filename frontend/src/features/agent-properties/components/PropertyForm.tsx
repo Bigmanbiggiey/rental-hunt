@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { AlertCircle } from 'lucide-react';
@@ -8,6 +9,7 @@ import {
   AlertTitle,
   Button,
   Checkbox,
+  Combobox,
   FieldError,
   Input,
   Label,
@@ -22,8 +24,15 @@ import { isAppError } from '@/shared/lib/errors';
 import type { Property, PropertyAvailabilityStatus } from '@/entities/property';
 import { useCreateProperty } from '../hooks/useCreateProperty';
 import { useUpdateProperty } from '../hooks/useUpdateProperty';
-import { useCounties, useLocations, usePropertyTypes, useAmenities } from '../hooks/useReferenceData';
+import {
+  useCounties,
+  useCreateLocation,
+  useLocations,
+  usePropertyTypes,
+  useAmenities,
+} from '../hooks/useReferenceData';
 import { CreatePropertySchema, type CreatePropertyFormInput } from '../schemas/createProperty.schema';
+import { LocationPickerMap } from './LocationPickerMap';
 
 const AVAILABILITY_OPTIONS: { value: PropertyAvailabilityStatus; label: string }[] = [
   { value: 'available', label: 'Available' },
@@ -51,12 +60,14 @@ export function PropertyForm({ property, onSuccess }: PropertyFormProps) {
   const { data: counties } = useCounties();
   const { data: propertyTypes } = usePropertyTypes();
   const { data: amenities } = useAmenities();
+  const createLocation = useCreateLocation();
 
   const {
     register,
     handleSubmit,
     control,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<CreatePropertyFormInput>({
     resolver: zodResolver(CreatePropertySchema),
@@ -81,10 +92,32 @@ export function PropertyForm({ property, onSuccess }: PropertyFormProps) {
   });
 
   const selectedCountyId = watch('countyId');
+  const watchedLatitude = watch('latitude');
+  const watchedLongitude = watch('longitude');
   const { data: locations } = useLocations(selectedCountyId);
   const isPending = isEditMode ? updateMutation.isPending : createMutation.isPending;
   const mutationError = isEditMode ? updateMutation.error : createMutation.error;
   const submissionError = isAppError(mutationError) ? mutationError.message : null;
+
+  function handleMapChange(lat: number, lng: number) {
+    setValue('latitude', lat, { shouldValidate: true, shouldDirty: true });
+    setValue('longitude', lng, { shouldValidate: true, shouldDirty: true });
+  }
+
+  // A previously-picked location belongs to a specific county — if the
+  // county changes, that location no longer makes sense (and, with the
+  // Combobox now making county switches fast, is far more likely to
+  // actually happen than it was with the old slow four-item Select).
+  // `useRef(selectedCountyId)` primes the "previous" value to whatever
+  // countyId already is on first render — including edit mode's prefilled
+  // value — so this only ever fires on a genuine *change*, never on mount.
+  const previousCountyId = useRef(selectedCountyId);
+  useEffect(() => {
+    if (previousCountyId.current !== selectedCountyId) {
+      setValue('locationId', '', { shouldValidate: false });
+      previousCountyId.current = selectedCountyId;
+    }
+  }, [selectedCountyId, setValue]);
 
   const onSubmit = handleSubmit((values) => {
     if (isEditMode && property) {
@@ -213,18 +246,16 @@ export function PropertyForm({ property, onSuccess }: PropertyFormProps) {
             control={control}
             name="countyId"
             render={({ field }) => (
-              <Select value={field.value ?? ''} onValueChange={field.onChange} disabled={isPending}>
-                <SelectTrigger id="countyId" aria-invalid={!!errors.countyId}>
-                  <SelectValue placeholder="Choose a county" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(counties ?? []).map((county) => (
-                    <SelectItem key={county.id} value={county.id}>
-                      {county.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Combobox
+                id="countyId"
+                value={field.value ?? ''}
+                onValueChange={field.onChange}
+                options={(counties ?? []).map((county) => ({ value: county.id, label: county.name }))}
+                placeholder="Choose a county"
+                searchPlaceholder="Search counties…"
+                disabled={isPending}
+                aria-invalid={!!errors.countyId}
+              />
             )}
           />
           {errors.countyId && <FieldError id="countyId-error">{errors.countyId.message}</FieldError>}
@@ -239,25 +270,34 @@ export function PropertyForm({ property, onSuccess }: PropertyFormProps) {
             control={control}
             name="locationId"
             render={({ field }) => (
-              <Select
+              <Combobox
+                id="locationId"
                 value={field.value ?? ''}
                 onValueChange={field.onChange}
+                options={(locations ?? []).map((location) => ({ value: location.id, label: location.name }))}
+                placeholder={selectedCountyId ? 'Choose or type a location' : 'Choose a county first'}
+                searchPlaceholder="Search or type a new neighborhood…"
+                emptyText="No matching neighborhood yet — type its full name to add it."
                 disabled={isPending || !selectedCountyId}
-              >
-                <SelectTrigger id="locationId" aria-invalid={!!errors.locationId}>
-                  <SelectValue placeholder={selectedCountyId ? 'Choose a location' : 'Choose a county first'} />
-                </SelectTrigger>
-                <SelectContent>
-                  {(locations ?? []).map((location) => (
-                    <SelectItem key={location.id} value={location.id}>
-                      {location.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                aria-invalid={!!errors.locationId}
+                onCreate={
+                  selectedCountyId
+                    ? async (name) => {
+                        const created = await createLocation.mutateAsync({ countyId: selectedCountyId, name });
+                        return created.id;
+                      }
+                    : undefined
+                }
+                createLabel={(name) => `Add "${name}" as a new location`}
+              />
             )}
           />
           {errors.locationId && <FieldError id="locationId-error">{errors.locationId.message}</FieldError>}
+        </div>
+
+        <div className="space-y-2 lg:col-span-2">
+          <Label>Map location</Label>
+          <LocationPickerMap latitude={watchedLatitude} longitude={watchedLongitude} onChange={handleMapChange} />
         </div>
 
         <div className="space-y-2">

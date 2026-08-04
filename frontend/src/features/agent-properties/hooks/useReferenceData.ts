@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { referenceDataRepository } from '@/entities/property';
 
 // Same query keys as `features/property-search/hooks/useReferenceData.ts` —
@@ -36,5 +36,23 @@ export function useAmenities() {
     queryKey: ['reference', 'amenities'],
     queryFn: () => referenceDataRepository.listAmenities(),
     staleTime: Infinity,
+  });
+}
+
+// Used by PropertyForm's Location combobox "create new" affordance. The
+// `locations` queries are `staleTime: Infinity` (reference data rarely
+// changes), so a successful create explicitly invalidates every cached
+// slice — every countyId-scoped key plus the unscoped one
+// `features/property-search` shares — rather than relying on a refetch
+// that would never happen on its own.
+export function useCreateLocation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ countyId, name }: { countyId: string; name: string }) =>
+      referenceDataRepository.createLocation(countyId, name),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['reference', 'locations'] });
+    },
   });
 }

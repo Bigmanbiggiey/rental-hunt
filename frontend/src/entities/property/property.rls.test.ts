@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { actorClient, serviceClient, signUpAgent } from '@/shared/lib/testing/rlsTestHelpers';
+import { actorClient, serviceClient, signUpActor, signUpAgent } from '@/shared/lib/testing/rlsTestHelpers';
 import { propertyRepository } from './property.repository';
 
 /**
@@ -509,5 +509,63 @@ describe('property-images Storage RLS (integration, local Supabase, Sprint 6)', 
     const guestRead = await guest.storage.from('property-images').download(path);
     expect(guestRead.error).toBeNull();
     await guest.auth.signOut();
+  });
+});
+
+// locations_insert_agent (post-Sprint-8 property-form work, 2026-08-04) —
+// lets an agent create a new `locations` row on the fly from the property
+// form's Location combobox, without granting the broader update/delete
+// access `locations_manage_admin` reserves for admin.
+describe('locations RLS — agent can insert, others cannot (integration, local Supabase)', () => {
+  const clients: SupabaseClient[] = [];
+  afterAll(async () => {
+    await Promise.all(clients.map((c) => c.auth.signOut()));
+  });
+
+  it('an agent can insert a new location; a customer and a guest are both blocked', async () => {
+    const agent = await signUpAgent('locationsInsertAgent', NAIROBI_HOMES_AGENCY_ID);
+    const customer = await signUpActor('locationsInsertCustomer');
+    const guest = actorClient('locationsInsertGuest');
+    clients.push(agent.client, customer.client, guest);
+
+    const { data: county } = await serviceClient.from('counties').select('id').limit(1).single();
+
+    const agentInsert = await agent.client
+      .from('locations')
+      .insert({ county_id: county!.id, name: `Agent Test Neighborhood ${Date.now()}` })
+      .select('id')
+      .single();
+    expect(agentInsert.error).toBeNull();
+    expect(agentInsert.data?.id).toBeTruthy();
+
+    const customerInsert = await customer.client
+      .from('locations')
+      .insert({ county_id: county!.id, name: `Customer Test Neighborhood ${Date.now()}` });
+    expect(customerInsert.error).not.toBeNull();
+
+    const guestInsert = await guest
+      .from('locations')
+      .insert({ county_id: county!.id, name: `Guest Test Neighborhood ${Date.now()}` });
+    expect(guestInsert.error).not.toBeNull();
+
+    // locations_manage_admin still governs update/delete — an agent's new
+    // insert policy doesn't widen those. RLS silently filters an
+    // update/delete down to zero matched rows rather than erroring, so the
+    // real proof is `.select()`'s returned rows being empty, not `.error`.
+    const agentUpdate = await agent.client
+      .from('locations')
+      .update({ name: 'Renamed' })
+      .eq('id', agentInsert.data!.id as string)
+      .select('id');
+    expect(agentUpdate.data).toEqual([]);
+
+    const { data: unchanged } = await serviceClient
+      .from('locations')
+      .select('name')
+      .eq('id', agentInsert.data!.id as string)
+      .single();
+    expect(unchanged?.name).not.toBe('Renamed');
+
+    await serviceClient.from('locations').delete().eq('id', agentInsert.data!.id as string);
   });
 });

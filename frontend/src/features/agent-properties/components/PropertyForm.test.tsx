@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Property } from '@/entities/property';
 import { AppError } from '@/shared/lib/errors';
@@ -19,11 +19,39 @@ vi.mock('../hooks/useUpdateProperty', () => ({
   useUpdateProperty: () => ({ mutate: mockUpdateMutate, isPending: updateIsPending, error: updateError }),
 }));
 
+// Same ids BASE_PROPERTY below uses for countyId/locationId — a prior
+// version of this mock used unrelated placeholder ids ('c1'/'l1') that
+// never matched, which nothing caught because no test asserted on the
+// county/location combobox's displayed text before this pass.
+const mockNairobiId = '3ff9bcab-8633-485c-ab51-d3ff579e22e0';
+const mockKilimaniId = '188c3f4b-a18b-424d-ae59-a63def850522';
+const mockKiambuId = 'a6f2e6b1-df3b-4a2a-9b3c-1a2b3c4d5e6f';
+
+const mockCreateLocationMutateAsync = vi.fn();
 vi.mock('../hooks/useReferenceData', () => ({
-  useCounties: () => ({ data: [{ id: 'c1', name: 'Nairobi' }] }),
-  useLocations: () => ({ data: [{ id: 'l1', name: 'Kilimani', countyId: 'c1' }] }),
+  useCounties: () => ({
+    data: [
+      { id: mockNairobiId, name: 'Nairobi' },
+      { id: mockKiambuId, name: 'Kiambu' },
+    ],
+  }),
+  useLocations: () => ({ data: [{ id: mockKilimaniId, name: 'Kilimani', countyId: mockNairobiId }] }),
   usePropertyTypes: () => ({ data: [{ id: 'pt1', name: 'Apartment' }] }),
   useAmenities: () => ({ data: [{ id: 'am1', name: 'Parking' }] }),
+  useCreateLocation: () => ({ mutateAsync: mockCreateLocationMutateAsync, isPending: false }),
+}));
+
+// LocationPickerMap owns a real Leaflet instance + Nominatim network calls
+// (LocationPickerMapCanvas, React.lazy-loaded) — not something a fast,
+// mocked-mutations component test should depend on. Stubbed with a button
+// that fires the same onChange callback the real map would, so the
+// "picking a point updates the form" wiring is still covered.
+vi.mock('./LocationPickerMap', () => ({
+  LocationPickerMap: ({ onChange }: { onChange: (lat: number, lng: number) => void }) => (
+    <button type="button" onClick={() => onChange(-1.3, 36.8)}>
+      Simulate map pick
+    </button>
+  ),
 }));
 
 const BASE_PROPERTY: Property = {
@@ -127,5 +155,66 @@ describe('PropertyForm (component)', () => {
 
     expect(screen.getByText('A listing with this title already exists.')).toBeInTheDocument();
     createError = null;
+  });
+
+  it('lets the county combobox be searched by typing, not just clicked through', async () => {
+    const user = userEvent.setup();
+    render(<PropertyForm />);
+
+    await user.click(screen.getByRole('combobox', { name: /county/i }));
+    await user.type(screen.getByPlaceholderText(/search counties/i), 'Kiambu');
+
+    expect(screen.getByRole('option', { name: 'Kiambu' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Nairobi' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('option', { name: 'Kiambu' }));
+    expect(screen.getByRole('combobox', { name: /county/i })).toHaveTextContent('Kiambu');
+  });
+
+  it('creates a new location on the fly when the typed neighborhood has no match', async () => {
+    mockCreateLocationMutateAsync.mockResolvedValueOnce({ id: 'l-new', countyId: mockNairobiId, name: 'Runda' });
+    const user = userEvent.setup();
+    render(<PropertyForm />);
+
+    await user.click(screen.getByRole('combobox', { name: /county/i }));
+    await user.click(screen.getByRole('option', { name: 'Nairobi' }));
+
+    await user.click(screen.getByRole('combobox', { name: /location/i }));
+    await user.type(screen.getByPlaceholderText(/search or type a new neighborhood/i), 'Runda');
+
+    const createOption = await screen.findByText('Add "Runda" as a new location');
+    await user.click(createOption);
+
+    expect(mockCreateLocationMutateAsync).toHaveBeenCalledWith({ countyId: mockNairobiId, name: 'Runda' });
+    // The mocked useLocations always returns the same static list (it
+    // doesn't simulate the real cache invalidation useCreateLocation
+    // triggers on success), so the newly "created" id genuinely has no
+    // matching option here — asserting the popover closed cleanly is the
+    // meaningful proof the create-then-select flow completed without error.
+    await waitFor(() =>
+      expect(screen.queryByText('Add "Runda" as a new location')).not.toBeInTheDocument(),
+    );
+  });
+
+  it('clears the selected location when the county changes, since it no longer applies', async () => {
+    const user = userEvent.setup();
+    render(<PropertyForm property={BASE_PROPERTY} />);
+
+    expect(screen.getByRole('combobox', { name: /location/i })).toHaveTextContent('Kilimani');
+
+    await user.click(screen.getByRole('combobox', { name: /county/i }));
+    await user.click(screen.getByRole('option', { name: 'Kiambu' }));
+
+    expect(screen.getByRole('combobox', { name: /location/i })).not.toHaveTextContent('Kilimani');
+  });
+
+  it('updates the latitude/longitude fields when a point is picked on the map', async () => {
+    const user = userEvent.setup();
+    render(<PropertyForm />);
+
+    await user.click(screen.getByRole('button', { name: /simulate map pick/i }));
+
+    expect(screen.getByLabelText(/latitude/i)).toHaveValue(-1.3);
+    expect(screen.getByLabelText(/longitude/i)).toHaveValue(36.8);
   });
 });

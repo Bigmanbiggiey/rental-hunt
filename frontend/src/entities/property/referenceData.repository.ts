@@ -21,6 +21,8 @@ export interface ReferenceDataRepository {
   listLocations(countyId?: string): Promise<Location[]>;
   listPropertyTypes(): Promise<PropertyType[]>;
   listAmenities(): Promise<Amenity[]>;
+  /** `locations_insert_agent` RLS policy — agent-role only. Used by the property form's Location combobox when no existing neighborhood matches what was typed. */
+  createLocation(countyId: string, name: string): Promise<Location>;
 }
 
 export const referenceDataRepository: ReferenceDataRepository = {
@@ -60,5 +62,16 @@ export const referenceDataRepository: ReferenceDataRepository = {
       .returns<AmenityRow[]>();
     if (error) throw mapSupabaseError(error);
     return (data ?? []).map((row) => ({ id: row.id, name: row.name, icon: row.icon }));
+  },
+
+  async createLocation(countyId, name) {
+    const { data, error } = await supabase
+      .from('locations')
+      .insert({ county_id: countyId, name })
+      .select('id, county_id, name')
+      .single()
+      .returns<LocationRow>();
+    if (error) throw mapSupabaseError(error);
+    return mapLocationRow(data);
   },
 };
