@@ -24,3 +24,8 @@ class ResizeObserverStub {
   disconnect() {}
 }
 globalThis.ResizeObserver ??= ResizeObserverStub as unknown as typeof ResizeObserver;
+
+// jsdom also has no scrollIntoView — cmdk (the shared Combobox's search
+// list) calls it internally to keep the highlighted item in view, first
+// exercised by a test in the post-Sprint-8 property-form work (2026-08-04).
+Element.prototype.scrollIntoView ??= () => {};
