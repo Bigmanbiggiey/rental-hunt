@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Users } from 'lucide-react';
-import { AdminUserTable, useAdminUsers, type AdminUserFilters } from '@/features/admin-users';
+import { AdminInviteUserDialog, AdminUserTable, useAdminUsers, type AdminUserFilters } from '@/features/admin-users';
 import { Alert, AlertDescription, Button, EmptyState, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Skeleton } from '@/shared/ui';
 import type { UserRole } from '@/entities/user';
 
@@ -8,15 +8,19 @@ const PAGE_SIZE = 20;
 const ROLES: UserRole[] = ['customer', 'agent', 'moderator', 'admin'];
 const ANY = '__any__';
 
-/** roadmap.md §11's DoD: "an admin can deactivate a user" — plus role management (api-design.md §9). */
+/** roadmap.md §11's DoD: "an admin can deactivate a user" — plus role management (api-design.md §9) and, post-Sprint-8, invite/delete (api-design.md §9/§12). */
 function AdminUsersPage() {
   const [filters, setFilters] = useState<AdminUserFilters>({});
   const [page, setPage] = useState(1);
+  const [inviteOpen, setInviteOpen] = useState(false);
   const { data, isLoading, isError } = useAdminUsers(filters, page, PAGE_SIZE);
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-h1 text-foreground font-semibold">Users</h1>
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-h1 text-foreground font-semibold">Users</h1>
+        <Button onClick={() => setInviteOpen(true)}>Invite user</Button>
+      </div>
 
       <Select
         value={filters.role ?? ANY}
@@ -79,6 +83,8 @@ function AdminUsersPage() {
           )}
         </>
       )}
+
+      <AdminInviteUserDialog open={inviteOpen} onOpenChange={setInviteOpen} />
     </div>
   );
 }

@@ -17,4 +17,20 @@ describe('AdminUpdateUserSchema (unit)', () => {
   it('rejects an unknown role value', () => {
     expect(AdminUpdateUserSchema.safeParse({ role: 'superuser' }).success).toBe(false);
   });
+
+  it('accepts a fullName-only update', () => {
+    expect(AdminUpdateUserSchema.safeParse({ fullName: 'Jane Wanjiru' }).success).toBe(true);
+  });
+
+  it('accepts clearing phone with an empty string', () => {
+    expect(AdminUpdateUserSchema.safeParse({ phone: '' }).success).toBe(true);
+  });
+
+  it('rejects a phone number not in international format', () => {
+    expect(AdminUpdateUserSchema.safeParse({ phone: '0712345678' }).success).toBe(false);
+  });
+
+  it('rejects a too-short fullName', () => {
+    expect(AdminUpdateUserSchema.safeParse({ fullName: 'J' }).success).toBe(false);
+  });
 });

@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { toast } from 'sonner';
 import {
+  Button,
   Card,
   CardContent,
   Label,
@@ -17,8 +19,10 @@ import {
   TableRow,
 } from '@/shared/ui';
 import { isAppError } from '@/shared/lib/errors';
-import type { Profile, UserRole } from '@/entities/user';
+import { useAuth, type Profile, type UserRole } from '@/entities/user';
 import { useAdminUpdateUser } from '../hooks/useAdminUpdateUser';
+import { DeleteUserDialog } from './DeleteUserDialog';
+import { EditUserDetailsDialog } from './EditUserDetailsDialog';
 
 export interface AdminUserTableProps {
   users: Profile[];
@@ -33,6 +37,9 @@ function titleCase(value: string): string {
 /** ui-guidelines.md §13.2: a real Table on >= lg, a stacked Card list on < lg. */
 export function AdminUserTable({ users }: AdminUserTableProps) {
   const { mutate, isPending } = useAdminUpdateUser();
+  const { profile: currentAdmin } = useAuth();
+  const [deletingUser, setDeletingUser] = useState<Profile | null>(null);
+  const [editingUser, setEditingUser] = useState<Profile | null>(null);
 
   const onError = (error: unknown) => {
     toast.error(isAppError(error) ? error.message : 'Something went wrong.');
@@ -69,6 +76,24 @@ export function AdminUserTable({ users }: AdminUserTableProps) {
     </div>
   );
 
+  // An admin can't delete their own row (admin-delete-user rejects it
+  // server-side regardless — this just avoids offering a button that would
+  // only ever fail). Every other row gets a Delete action; whether it
+  // actually succeeds depends on the account having no real activity, which
+  // the dialog explains rather than this table pre-computing per row.
+  const deleteButton = (user: Profile) =>
+    user.id === currentAdmin?.id ? null : (
+      <Button variant="ghost" size="sm" onClick={() => setDeletingUser(user)}>
+        Delete
+      </Button>
+    );
+
+  const editButton = (user: Profile) => (
+    <Button variant="ghost" size="sm" onClick={() => setEditingUser(user)}>
+      Edit
+    </Button>
+  );
+
   return (
     <>
       <div className="hidden lg:block">
@@ -79,6 +104,7 @@ export function AdminUserTable({ users }: AdminUserTableProps) {
               <TableHead>Phone</TableHead>
               <TableHead>Role</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -88,6 +114,12 @@ export function AdminUserTable({ users }: AdminUserTableProps) {
                 <TableCell>{user.phone ?? '—'}</TableCell>
                 <TableCell>{roleSelect(user)}</TableCell>
                 <TableCell>{activeSwitch(user)}</TableCell>
+                <TableCell className="text-right">
+                  <div className="flex justify-end gap-1">
+                    {editButton(user)}
+                    {deleteButton(user)}
+                  </div>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -105,11 +137,36 @@ export function AdminUserTable({ users }: AdminUserTableProps) {
                 </div>
                 {roleSelect(user)}
                 {activeSwitch(user)}
+                <div className="flex gap-1">
+                  {editButton(user)}
+                  {deleteButton(user)}
+                </div>
               </CardContent>
             </Card>
           </li>
         ))}
       </ul>
+
+      {deletingUser && (
+        <DeleteUserDialog
+          open={!!deletingUser}
+          onOpenChange={(open) => {
+            if (!open) setDeletingUser(null);
+          }}
+          userId={deletingUser.id}
+          userName={deletingUser.fullName}
+        />
+      )}
+
+      {editingUser && (
+        <EditUserDetailsDialog
+          open={!!editingUser}
+          onOpenChange={(open) => {
+            if (!open) setEditingUser(null);
+          }}
+          user={editingUser}
+        />
+      )}
     </>
   );
 }

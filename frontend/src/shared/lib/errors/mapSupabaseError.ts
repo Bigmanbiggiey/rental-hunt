@@ -142,6 +142,8 @@ function friendlyMessage(code: ErrorCode): string {
       return 'This agent could not be found.';
     case 'EMAIL_ALREADY_REGISTERED':
       return 'An account with this email already exists.';
+    case 'USER_HAS_ACTIVITY':
+      return 'This user has real activity and cannot be deleted — deactivate them instead.';
     case 'CONFLICT':
       return 'This conflicts with an existing record.';
     case 'PROPERTY_NOT_AVAILABLE':
