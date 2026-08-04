@@ -20,6 +20,16 @@
   --color-surface: #ffffff;
   --color-card: #ffffff;
   --color-card-foreground: #0f172a;
+  /* --color-popover/--color-popover-foreground: same gap as --color-card
+     above — §21's cheat-sheet never transcribed these, but Select's and
+     DropdownMenu's generated shadcn/ui markup both use `bg-popover`/
+     `text-popover-foreground`. Undefined meant the class resolved to
+     nothing at all in Tailwind v4 — every dropdown panel had no background
+     color, so page content behind it showed straight through (found
+     2026-08-05, agent property form). Same values as --color-card, the
+     closest existing token to "an opaque surface floating above content." */
+  --color-popover: #ffffff;
+  --color-popover-foreground: #0f172a;
   --color-primary: #1e3a5f;
   --color-primary-foreground: #ffffff;
   --color-secondary: #059669;
@@ -115,6 +125,8 @@
   --color-surface: #111827;
   --color-card: #111827;
   --color-card-foreground: #f1f5f9;
+  --color-popover: #111827;
+  --color-popover-foreground: #f1f5f9;
   --color-primary: #3b6ea5;
   --color-primary-foreground: #0b1220;
   --color-secondary: #10b981;
