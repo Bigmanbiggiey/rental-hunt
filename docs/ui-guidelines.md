@@ -599,6 +599,12 @@ Maps `properties.verification_status` (`database.md` §6):
 
 **Behavior:** `Button` `variant="default" size="lg"`, sticky at the bottom of the viewport on mobile (safe-area aware) so it's reachable at any scroll position; disabled with an explanatory `Alert` (§11.19) if `availability_status !== 'available'` (per the booking-integrity rule enforced at the database layer, `database.md` §9); for guests, clicking opens the login/registration flow rather than the booking form.
 
+## 12.14.1 Verification Review Page (moderator/admin)
+
+**Purpose:** Let a moderator/admin actually see the listing they're deciding on (post-Sprint-8) — "the point of verification is to verify whatever the agent has entered is correct and accurate information," not just a title in a confirmation dialog.
+
+**Behavior:** Clicking "Review" in the Verification Queue table/card (§13.2) navigates to a dedicated page (`/admin-dashboard/verification-queue/:id`, and the moderator-dashboard equivalent) rather than opening a dialog. Reuses the exact same component set and order as the public Property Details Layout (§12.4) — Gallery → Title/Price/Verification Badge → bed/bath/type → Location + Map → Description → Amenities Grid → Agent Card — so a reviewer sees precisely what a guest would eventually see, field for field. The decision surface (reason field + Reject/Approve) is a fixed action bar at the bottom of the page (`VerificationActionBar`), sticky on mobile / in-flow at the bottom of content on `sm:` and up — the same breakpoint pattern as the Viewing CTA (§12.14) — rather than a separate modal. A reason is required to reject (§6.9's existing rule); approving needs none. On success, returns to the queue.
+
 ---
 
 # 13. Dashboard Components
