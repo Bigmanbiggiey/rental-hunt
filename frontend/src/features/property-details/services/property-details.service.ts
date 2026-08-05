@@ -19,4 +19,9 @@ export const propertyDetailsService = {
       propertyTypeId: property.propertyTypeId,
     });
   },
+
+  /** AGENT-008. Fire-and-forget from `useTrackPropertyView` — see that hook for the dedup rule. */
+  async incrementView(id: string): Promise<void> {
+    return propertyRepository.incrementViewCount(id);
+  },
 };

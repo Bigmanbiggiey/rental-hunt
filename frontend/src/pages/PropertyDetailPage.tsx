@@ -13,7 +13,7 @@ import {
   ViewingCTA,
 } from '@/entities/property';
 import { useAmenities } from '@/features/property-search';
-import { useProperty } from '@/features/property-details';
+import { useProperty, useTrackPropertyView } from '@/features/property-details';
 import { useFavoriteIds, useToggleFavorite } from '@/features/favorites';
 import { BookingRequestDialog } from '@/features/viewing-requests';
 import { useAuth } from '@/entities/user';
@@ -34,6 +34,9 @@ function PropertyDetailPage() {
   const { data: favoriteIds } = useFavoriteIds();
   const toggleFavorite = useToggleFavorite();
   const [bookingOpen, setBookingOpen] = useState(false);
+  // AGENT-008. Called unconditionally (hooks can't run after the early
+  // returns below) — the hook itself no-ops until `property` has loaded.
+  useTrackPropertyView(property?.id);
 
   if (isLoading) {
     return (
