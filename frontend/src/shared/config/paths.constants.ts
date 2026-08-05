@@ -13,8 +13,8 @@ export const PATHS = {
     register: '/register',
     forgotPassword: '/forgot-password',
     resetPassword: '/reset-password',
-    // CONTENT-001/002 (user-stories.md Epic 11, added 2026-08-05).
-    about: '/about',
+    // CONTENT-002 (user-stories.md Epic 11, added 2026-08-05). CONTENT-001
+    // (About) has no route of its own — merged into home, 2026-08-05.
     contact: '/contact',
   },
   // Every authenticated role has its own independent dashboard route group

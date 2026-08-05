@@ -33,8 +33,9 @@ const ForgotPasswordPage = lazy(() =>
 const ResetPasswordPage = lazy(() =>
   import('@/pages/ResetPasswordPage').then((m) => ({ default: m.ResetPasswordPage })),
 );
-// CONTENT-001/002/005 (user-stories.md Epic 11, added 2026-08-05).
-const AboutPage = lazy(() => import('@/pages/AboutPage').then((m) => ({ default: m.AboutPage })));
+// CONTENT-002/005 (user-stories.md Epic 11, added 2026-08-05). CONTENT-001
+// (About) was reworked 2026-08-05 into a section on HomePage itself rather
+// than its own route — see HomePage.tsx.
 const ContactPage = lazy(() => import('@/pages/ContactPage').then((m) => ({ default: m.ContactPage })));
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
 const ProfilePage = lazy(() =>
@@ -134,7 +135,6 @@ export const routeConfig: RouteObject[] = [
       { path: PATHS.public.register, element: <RegisterPage /> },
       { path: PATHS.public.forgotPassword, element: <ForgotPasswordPage /> },
       { path: PATHS.public.resetPassword, element: <ResetPasswordPage /> },
-      { path: PATHS.public.about, element: <AboutPage /> },
       { path: PATHS.public.contact, element: <ContactPage /> },
       {
         // Any authenticated role — Profile is the one authenticated route
