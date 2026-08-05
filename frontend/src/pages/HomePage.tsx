@@ -1,5 +1,8 @@
+import { Link } from 'react-router';
 import { CalendarCheck, Eye, Search } from 'lucide-react';
 import { FeaturedListings, SearchHero } from '@/widgets';
+import { Button } from '@/shared/ui';
+import { PATHS } from '@/shared/config';
 
 // CONTENT-001 (reworked 2026-08-05): this "How it works" section used to be
 // AboutPage.tsx, a separate /about route — merged directly into the
@@ -36,6 +39,9 @@ function HomePage() {
             </div>
           ))}
         </div>
+        <Button asChild size="lg" className="self-start">
+          <Link to={PATHS.public.properties}>Browse Properties</Link>
+        </Button>
       </section>
 
       <FeaturedListings />
