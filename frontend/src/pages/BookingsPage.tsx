@@ -4,6 +4,7 @@ import {
   useViewingRequestsRealtime,
   ViewingRequestList,
 } from '@/features/viewing-requests';
+import { BookingReviewAction } from '@/widgets/booking-review';
 import type { ViewingStatus } from '@/entities/viewing-request';
 import {
   Alert,
@@ -82,6 +83,11 @@ function BookingsPage() {
           <ViewingRequestList
             viewingRequests={data.data}
             emptyMessage="Book a viewing from any property's details page to see it here."
+            renderExtraActions={(viewingRequest) =>
+              viewingRequest.status === 'completed' ? (
+                <BookingReviewAction viewingRequest={viewingRequest} />
+              ) : undefined
+            }
           />
 
           {data.meta.totalPages > 1 && (

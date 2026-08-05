@@ -5,6 +5,7 @@ import {
   useViewingRequestsRealtime,
   ViewingRequestList,
 } from '@/features/viewing-requests';
+import { BookingReviewAction } from '@/widgets/booking-review';
 import { Alert, AlertDescription, Button, Skeleton } from '@/shared/ui';
 import { PATHS } from '@/shared/config';
 
@@ -141,6 +142,15 @@ function UserDashboardOverviewPage() {
             <ViewingRequestList
               viewingRequests={completed.data.data}
               emptyMessage="Viewings you've completed will show up here."
+              renderExtraActions={(viewingRequest) =>
+                // This section's own query also includes 'no_show' (line 47
+                // above, pre-existing) — a review only makes sense for a
+                // genuinely completed viewing, so the action is gated here,
+                // not left to fail against enforce_review_eligibility().
+                viewingRequest.status === 'completed' ? (
+                  <BookingReviewAction viewingRequest={viewingRequest} />
+                ) : undefined
+              }
             />
           )}
         </section>

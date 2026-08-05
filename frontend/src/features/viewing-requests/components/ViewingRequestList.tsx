@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { CalendarClock } from 'lucide-react';
 import { toast } from 'sonner';
 import { EmptyState } from '@/shared/ui';
@@ -14,9 +14,19 @@ import { CancelBookingDialog } from './CancelBookingDialog';
 export function ViewingRequestList({
   viewingRequests,
   emptyMessage,
+  renderExtraActions,
 }: {
   viewingRequests: ViewingRequest[];
   emptyMessage: string;
+  /**
+   * Epic 12's "Write a review" action — deliberately a render-prop, not a
+   * direct `features/reviews` import: features can't cross-import each
+   * other (coding-standards.md §3.2), so the actual review-dialog wiring
+   * lives one layer up (a widget/page, which may import both). Returning
+   * `undefined` for a given booking (e.g. anything not `completed`) falls
+   * back to `BookingCard`'s own default Cancel-button behavior unchanged.
+   */
+  renderExtraActions?: (viewingRequest: ViewingRequest) => ReactNode;
 }) {
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const { mutate, isPending } = useCancelViewingRequest();
@@ -35,6 +45,7 @@ export function ViewingRequestList({
           viewingRequest={viewingRequest}
           onCancelClick={() => setCancellingId(viewingRequest.id)}
           isCancelling={isPending && cancellingId === viewingRequest.id}
+          actions={renderExtraActions?.(viewingRequest)}
         />
       ))}
 
