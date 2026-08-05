@@ -1,4 +1,4 @@
-import type { Agency } from './agency.types';
+import type { Agency, AgencyOnboardingStatus, SocialLinks } from './agency.types';
 
 /** Shape of a raw `public.agencies` row (database.md §5.3), snake_case as PostgREST returns it. */
 export interface AgencyRow {
@@ -11,6 +11,10 @@ export interface AgencyRow {
   email: string | null;
   county_id: string | null;
   is_active: boolean;
+  social_links: SocialLinks;
+  onboarding_status: AgencyOnboardingStatus;
+  applied_by: string | null;
+  rejection_reason: string | null;
 }
 
 export function mapAgencyRow(row: AgencyRow): Agency {
@@ -24,5 +28,9 @@ export function mapAgencyRow(row: AgencyRow): Agency {
     email: row.email,
     countyId: row.county_id,
     isActive: row.is_active,
+    socialLinks: row.social_links ?? {},
+    onboardingStatus: row.onboarding_status,
+    appliedBy: row.applied_by,
+    rejectionReason: row.rejection_reason,
   };
 }

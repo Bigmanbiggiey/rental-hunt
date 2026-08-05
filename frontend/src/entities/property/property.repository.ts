@@ -52,6 +52,15 @@ export interface PropertyRepository {
    * is the real authority here, not a client-side filter.
    */
   getByIdAdmin(id: string): Promise<Property>;
+  /**
+   * Epic 12's Admin Overview "Total properties" drill-down — every property
+   * platform-wide, not scoped to one agency (RLS's
+   * `properties_select_all_moderator_admin` policy is the authority; unlike
+   * `listForAgent`, there's no narrower "my own" scope to defend against
+   * here, admin/moderator are meant to see everything). Offset-paginated
+   * (database.md §14/§16.2), same shape as `listForAgent`.
+   */
+  listAllAdmin(page?: number, pageSize?: number): Promise<AgentPropertyListResult>;
 }
 
 // api-design.md §6.1's underlying-call shape — one query, no N+1 client-side
@@ -159,6 +168,7 @@ export const propertyRepository: PropertyRepository = {
 
     if (filters.county) query = query.eq('county_id', filters.county);
     if (filters.propertyType) query = query.eq('property_type_id', filters.propertyType);
+    if (filters.agencyId) query = query.eq('agency_id', filters.agencyId);
     if (filters.bedroomsMin !== undefined) query = query.gte('bedrooms', filters.bedroomsMin);
     if (filters.bedroomsMax !== undefined) query = query.lte('bedrooms', filters.bedroomsMax);
     if (filters.minPrice !== undefined) query = query.gte('rent_amount', filters.minPrice);
@@ -417,5 +427,25 @@ export const propertyRepository: PropertyRepository = {
 
   async getByIdAdmin(id) {
     return fetchById(id);
+  },
+
+  async listAllAdmin(page = 1, pageSize = DEFAULT_PAGE_SIZE) {
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+
+    const { data, error, count } = await supabase
+      .from('properties')
+      .select(PROPERTY_COLUMNS, { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(from, to)
+      .returns<PropertyRow[]>();
+
+    if (error) throw mapSupabaseError(error);
+
+    const total = count ?? 0;
+    return {
+      data: (data ?? []).map(mapPropertyRow),
+      meta: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
+    };
   },
 };

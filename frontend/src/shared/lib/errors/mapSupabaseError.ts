@@ -63,6 +63,7 @@ const POSTGREST_ERROR_CODE_MAP: Partial<Record<string, ErrorCode>> = {
   RH001: 'PROPERTY_NOT_AVAILABLE', // prevent_booking_unavailable_property() trigger (database.md §9) — a dedicated errcode so this specific rejection doesn't fall through to the generic DATABASE_ERROR default.
   RH002: 'INVALID_STATE_TRANSITION', // submit_property_for_verification() RPC (database.md §9, Sprint 6) — wrong-source-status case; reuses the existing code rather than adding a new one-off.
   P0002: 'PROPERTY_NOT_FOUND', // set_property_verification() RPC (database.md §9, Sprint 7) — standard PL/pgSQL "no_data_found" SQLSTATE, not a custom RH00N (Sprint 7 plan's Open Questions: the "reason required when rejecting" case already fits the existing 23514 -> VALIDATION_ERROR mapping, so no new custom code was needed there; this one genuinely has no existing signal to reuse).
+  RH003: 'REVIEW_NOT_ELIGIBLE', // enforce_review_eligibility() trigger (database.md §9, Epic 12) — the viewing request isn't the reviewer's own completed booking.
 };
 
 export interface MapSupabaseErrorOptions {
@@ -150,6 +151,8 @@ function friendlyMessage(code: ErrorCode): string {
       return 'This property is no longer available for booking.';
     case 'INVALID_STATE_TRANSITION':
       return 'This action can’t be performed in the current state.';
+    case 'REVIEW_NOT_ELIGIBLE':
+      return 'You can only review your own completed viewings, and only once each.';
     case 'RATE_LIMITED':
       return 'Too many attempts. Please wait a few minutes and try again.';
     case 'STORAGE_ERROR':

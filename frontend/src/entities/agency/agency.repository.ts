@@ -2,7 +2,13 @@ import { supabase } from '@/shared/lib/supabase';
 import { mapSupabaseError } from '@/shared/lib/errors/mapSupabaseError';
 import { slugify } from '@/shared/lib/slugify';
 import { mapAgencyRow, type AgencyRow } from './agency.mapper';
-import type { Agency, CreateAgencyInput, UpdateAgencyInput } from './agency.types';
+import type {
+  Agency,
+  AgencyOnboardingStatus,
+  ApplyForAgencyInput,
+  CreateAgencyInput,
+  UpdateAgencyInput,
+} from './agency.types';
 
 // api-design.md §13. `getById` is a documented extension, not in the
 // original contract — the admin edit form needs to fetch a single agency to
@@ -10,21 +16,36 @@ import type { Agency, CreateAgencyInput, UpdateAgencyInput } from './agency.type
 // CLAUDE.md §6's "extend the contract first" rule applies (recorded in
 // api-design.md §13 alongside this method in the same change).
 export interface AgencyRepository {
-  list(filters?: { county?: string }): Promise<Agency[]>;
+  list(filters?: { county?: string; onboardingStatus?: AgencyOnboardingStatus }): Promise<Agency[]>;
   getById(id: string): Promise<Agency>;
   getBySlug(slug: string): Promise<Agency>;
   /** Admin only (RLS `agencies_insert_admin`) — `slug` is Service-resolved via `slugify(name)`, never user-editable. */
   create(input: CreateAgencyInput): Promise<Agency>;
   /** Admin (any field), or the agency's own agent (RLS `agencies_update_own_agent` — non-critical fields only). */
   update(id: string, input: UpdateAgencyInput): Promise<Agency>;
+  /**
+   * A customer applying for their own new agency (Epic 12, RLS
+   * `agencies_insert_self`). `onboarding_status`/`is_active`/`applied_by` are
+   * never sent — `enforce_agency_onboarding_status()` forces them
+   * server-side regardless.
+   */
+  applySelf(input: ApplyForAgencyInput): Promise<Agency>;
+  /** Admin only — `approve_agency_application()` RPC (database.md §9). */
+  approve(id: string): Promise<Agency>;
+  /** Admin only — `reject_agency_application()` RPC; `reason` is required. */
+  reject(id: string, reason: string): Promise<Agency>;
+  /** The signed-in customer's own application, if they've made one (RLS `agencies_select_own_applicant`) — powers the "pending review"/"rejected: reason" status page. `null` when they've never applied. */
+  getMyApplication(): Promise<Agency | null>;
 }
 
-const AGENCY_COLUMNS = 'id, name, slug, description, logo_url, phone, email, county_id, is_active';
+const AGENCY_COLUMNS =
+  'id, name, slug, description, logo_url, phone, email, county_id, is_active, social_links, onboarding_status, applied_by, rejection_reason';
 
 export const agencyRepository: AgencyRepository = {
   async list(filters = {}) {
     let query = supabase.from('agencies').select(AGENCY_COLUMNS).order('name', { ascending: true });
     if (filters.county) query = query.eq('county_id', filters.county);
+    if (filters.onboardingStatus) query = query.eq('onboarding_status', filters.onboardingStatus);
 
     const { data, error } = await query.returns<AgencyRow[]>();
     if (error) throw mapSupabaseError(error);
@@ -64,6 +85,7 @@ export const agencyRepository: AgencyRepository = {
         phone: input.phone,
         email: input.email,
         county_id: input.countyId,
+        social_links: input.socialLinks ?? {},
       })
       .select(AGENCY_COLUMNS)
       .single<AgencyRow>();
@@ -80,6 +102,7 @@ export const agencyRepository: AgencyRepository = {
     if (input.phone !== undefined) patch.phone = input.phone;
     if (input.email !== undefined) patch.email = input.email;
     if (input.countyId !== undefined) patch.county_id = input.countyId;
+    if (input.socialLinks !== undefined) patch.social_links = input.socialLinks;
     if (input.isActive !== undefined) patch.is_active = input.isActive;
 
     const { data, error } = await supabase
@@ -91,5 +114,58 @@ export const agencyRepository: AgencyRepository = {
 
     if (error) throw mapSupabaseError(error, { notFoundCode: 'AGENCY_NOT_FOUND' });
     return mapAgencyRow(data);
+  },
+
+  async applySelf(input) {
+    const { data, error } = await supabase
+      .from('agencies')
+      .insert({
+        name: input.name,
+        slug: slugify(input.name),
+        description: input.description,
+        logo_url: input.logoUrl,
+        phone: input.phone,
+        email: input.email,
+        county_id: input.countyId,
+        social_links: input.socialLinks ?? {},
+      })
+      .select(AGENCY_COLUMNS)
+      .single<AgencyRow>();
+
+    if (error) throw mapSupabaseError(error);
+    return mapAgencyRow(data);
+  },
+
+  async approve(id) {
+    const { data, error } = await supabase
+      .rpc('approve_agency_application', { p_agency_id: id })
+      .single<AgencyRow>();
+
+    if (error) throw mapSupabaseError(error, { notFoundCode: 'AGENCY_NOT_FOUND' });
+    return mapAgencyRow(data);
+  },
+
+  async reject(id, reason) {
+    const { data, error } = await supabase
+      .rpc('reject_agency_application', { p_agency_id: id, p_reason: reason })
+      .single<AgencyRow>();
+
+    if (error) throw mapSupabaseError(error, { notFoundCode: 'AGENCY_NOT_FOUND' });
+    return mapAgencyRow(data);
+  },
+
+  async getMyApplication() {
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError) throw mapSupabaseError(userError);
+    if (!userData.user) return null;
+
+    const { data, error } = await supabase
+      .from('agencies')
+      .select(AGENCY_COLUMNS)
+      .eq('applied_by', userData.user.id)
+      .maybeSingle<AgencyRow>();
+
+    if (error) throw mapSupabaseError(error);
+    return data ? mapAgencyRow(data) : null;
   },
 };

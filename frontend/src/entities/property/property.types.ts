@@ -99,6 +99,13 @@ export interface PropertyFilters {
   maxPrice?: number;
   amenities?: UUID[];
   sort?: PropertySortOrder;
+  /**
+   * Epic 12's public Agency Profile Page — the same public, guest-visible
+   * feed as everywhere else `list()` is used, just narrowed to one agency's
+   * properties, so it reuses this method's existing cursor/sort/amenity
+   * logic rather than a separate near-duplicate method.
+   */
+  agencyId?: UUID;
 }
 
 /** api-design.md §16.1 — opaque to callers; only ever passed back verbatim. */

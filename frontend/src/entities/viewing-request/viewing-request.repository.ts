@@ -34,6 +34,13 @@ export interface ViewingRequestRepository {
   complete(id: string): Promise<ViewingRequest>;
   /** BOOK-006. Only while `status = 'confirmed'` (api-design.md §8.9). */
   markNoShow(id: string): Promise<ViewingRequest>;
+  /**
+   * Epic 12's Admin Overview "Bookings this week" drill-down — every viewing
+   * request platform-wide, not scoped to one agent (RLS's admin/moderator
+   * "SELECT all" policy is the authority). Offset-paginated, same shape as
+   * `listForCustomer`/`listForAgent`.
+   */
+  listAllAdmin(page?: number, pageSize?: number): Promise<ViewingRequestListResult>;
 }
 
 // `customer:profiles(...)` embed added Sprint 6 for BOOK-001's booking queue
@@ -258,5 +265,25 @@ export const viewingRequestRepository: ViewingRequestRepository = {
 
     if (error) throw mapSupabaseError(error, { notFoundCode: 'INVALID_STATE_TRANSITION' });
     return mapViewingRequestRow(data);
+  },
+
+  async listAllAdmin(page = 1, pageSize = DEFAULT_PAGE_SIZE) {
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+
+    const { data, error, count } = await supabase
+      .from('viewing_requests')
+      .select(VIEWING_REQUEST_COLUMNS, { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(from, to)
+      .returns<ViewingRequestRow[]>();
+
+    if (error) throw mapSupabaseError(error);
+
+    const total = count ?? 0;
+    return {
+      data: (data ?? []).map(mapViewingRequestRow),
+      meta: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
+    };
   },
 };
