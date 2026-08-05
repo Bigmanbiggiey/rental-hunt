@@ -367,6 +367,16 @@ Same states/accessibility pattern as Input. Used for property descriptions, view
 
 **Accessibility:** The trigger is a real `role="combobox"` button labelled the same way a `Select` trigger is (`<Label htmlFor>` pointing at its `id`); the popover's list uses `cmdk`'s own `role="option"` items and arrow-key/type-ahead handling — no custom keyboard handling written here either.
 
+## 11.4.2 DatePicker / TimePicker
+
+Added 2026-08-05 for the viewing-request booking/reschedule dialogs — replaces the bare native `type="date"`/`type="time"` inputs those forms used before, the latter of which never showed AM/PM at all. Same "Radix doesn't cover this, build it on the existing primitives" precedent as Combobox above.
+
+**DatePicker** composes a new `Calendar` (a thin Tailwind-themed wrapper around `react-day-picker`, the first calendar library in this project) inside `Popover`/`PopoverContent`, behind a `Button`-styled trigger showing the formatted selected date or a "Choose a date" placeholder. Dates before `minDate` (defaults to today) are disabled directly in the calendar, matching the booking schemas' own `>= today` rule — an invalid date can't even be picked, not just rejected on submit.
+
+**TimePicker** composes three `Select`s (Hour 1–12, Minute in 15-minute steps, AM/PM) — the 12-hour+AM/PM representation never leaves the component; `onChange` always emits the same 24-hour `HH:MM` string the schemas already validate. **Genuinely stateful, not a pure derivation of its `value` prop** — a real bug found while building it, not just a design note: since `onChange` only fires once both hour and minute are known, a version with no memory of its own beyond the external `value` had no way to render an in-progress selection (picking the hour alone changed nothing the parent could see), so the minute picker that followed always read a stale, empty hour — a dead end where a user could never finish picking a time at all. Local state holds each in-progress selection; it re-syncs from an externally-changed `value` (e.g. `form.reset()`) via a render-time state adjustment, not a `useEffect` (calling `setState` synchronously in an effect body is a real lint error this project enforces).
+
+**Testing note:** both are driven via `react-hook-form`'s `Controller`, not `register()`, since neither is a native input. Component tests must individually `await` each keyboard press when driving the `Select` in `TimePicker` — Radix moves focus between options via an internal `setTimeout`, so a single chained `user.keyboard('{ArrowDown}{ArrowDown}...')` call can outrun it. `jsdom` also has no Pointer Capture API, needed by Radix `Select`; polyfilled once in `src/test/setup.ts` rather than per-test.
+
 ## 11.5 Checkbox
 
 **Purpose:** Binary or multi-select choices (amenity filters, "remember me").
@@ -541,7 +551,7 @@ This order is deliberate: price and availability (the fastest disqualifiers) app
 
 **Purpose:** Surface agent identity and trust signal (`PROP-005`).
 
-**Anatomy:** Avatar (§11.8) + name + job title + agency name/logo + short bio. On the public detail page this pulls only the public-safe fields exposed by the `agent_directory` view (`database.md` §9) — never phone/email directly rendered without an explicit "Contact" action.
+**Anatomy:** Avatar (§11.8) + name + agency name + job title + short bio. On the public detail page this pulls only the public-safe fields exposed by the `agent_directory` view (`database.md` §9) — never phone/email directly rendered without an explicit "Contact" action. Agency **name** shown (added 2026-08-05, per the row's own long-standing spec here) in `text-primary` to read as a trust signal, not just metadata; agency **logo** still isn't — no `agency-logos` Storage bucket/upload UI exists yet (`database.md` §10), unrelated to this row's own scope.
 
 ## 12.8 Availability Badge
 
@@ -655,7 +665,7 @@ See §7.3 for widths/breakpoint behavior. Contains: logo/agency mark, primary na
 
 ## 13.8 Top Navigation
 
-Persistent across all dashboard screens: logo (links to dashboard home), page title/breadcrumb (§11.15), and the User Menu (§13.9) right-aligned. On mobile, also hosts the hamburger trigger for the sidebar Drawer.
+Persistent across all dashboard screens: logo (links to dashboard home), page title/breadcrumb (§11.15), and the User Menu (§13.9) right-aligned. On mobile, also hosts the hamburger trigger for the sidebar Drawer. **Agent dashboard only** (added 2026-08-05): a `text-body-sm text-muted-foreground` subtitle line under the logo showing the signed-in agent's own agency name — `DashboardShell`'s optional `subtitle` prop, which the other three roles simply don't pass rather than a role branch inside the shared shell.
 
 ## 13.9 User Menu
 
@@ -731,7 +741,7 @@ All search filters, sort order, and pagination cursors are reflected in the URL 
 
 ## 15.9 Footer
 
-Added 2026-08-05 (§24, `CONTENT-001`/`002`) — `FEAT-010`'s Footer had no link content spec until this point (copyright line only, since Sprint 1). Now: copyright line (left) + a footer nav (right, stacked below on mobile) linking About and Contact. Terms of Service and Privacy Policy are deliberately not linked yet — those pages don't exist until real legal text is supplied (`roadmap.md` §13, `CONTENT-004`); add both links here in the same change that builds them.
+Added 2026-08-05 (§24, `CONTENT-002`) — `FEAT-010`'s Footer had no link content spec until this point (copyright line only, since Sprint 1). Now: copyright line (left) + a footer nav (right, stacked below on mobile) linking Contact. An About link was here too until 2026-08-05, when that content merged into the homepage and stopped being a separate route. Terms of Service and Privacy Policy are deliberately not linked yet — those pages don't exist until real legal text is supplied (`roadmap.md` §13, `CONTENT-004`); add both links here in the same change that builds them.
 
 ---
 
@@ -961,9 +971,9 @@ The following are intentionally deferred beyond the MVP, consistent with `vision
 
 Added 2026-08-05 (`CONTENT-001`/`002`/`005`, `user-stories.md` Epic 11).
 
-## 24.1 About Page (`/about`)
+## 24.1 How It Works (homepage section, not a standalone page)
 
-Reuses `UserDashboardOverviewPage`'s already-established welcome-block anatomy (§13.12) verbatim — tagline `<h1>`, a 3-step "how it works" row, a "Browse Properties" CTA, and static trust chips — since a guest never sees that post-login page at all and the same explanation applies. Not a dashboard component itself; lives in `pages/AboutPage.tsx`, reachable from the Footer (§15).
+**Reworked 2026-08-05.** Originally a dedicated `/about` page reusing `UserDashboardOverviewPage`'s welcome-block anatomy (§13.12) verbatim. The developer asked for it to be merged into the homepage instead — `SearchHero` (§12) already carries the tagline and trust badges a separate About page would otherwise repeat, so only the 3-step "how it works" grid (Search → Compare → Book a Viewing) was genuinely new; it now lives inline in `pages/HomePage.tsx`, rendered between `SearchHero` and `FeaturedListings`. No longer reachable from the Footer (§15) as a separate link — it's simply part of the page every guest already lands on.
 
 ## 24.2 Contact Page (`/contact`)
 

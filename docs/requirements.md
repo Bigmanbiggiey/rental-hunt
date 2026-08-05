@@ -213,7 +213,7 @@ Added post-Sprint-8 (2026-08-05): a documentation-drift review found these pages
 
 ### FR-CONTENT-001
 
-A public About / How It Works page must explain what Rental Hunt KE is and the search → compare → book viewing flow, reachable from primary site navigation.
+The homepage must explain what Rental Hunt KE is and the search → compare → book viewing flow. Reworked 2026-08-05 from a standalone About page into a section on the homepage itself — no separate route.
 
 ### FR-CONTENT-002
 

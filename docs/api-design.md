@@ -166,6 +166,7 @@ interface Agent {
   jobTitle: string | null;
   bio: string | null;
   isActive: boolean;
+  agencyName: string; // joined from agencies, added 2026-08-05 — entities/property's public-facing PropertyAgent gained the same field via agent_directory's own join (database.md §9), a separate join from entities/agent's own
 }
 
 interface PropertyImage {
@@ -485,12 +486,12 @@ Route prefix: none (logical root). All routes below are the Repository's contrac
 |---|---|
 | **Method / Route** | `GET /properties/:slug` |
 | **Repository Function** | `propertyRepository.getBySlug(slug: string)` |
-| **Underlying call** | The same `PROPERTY_COLUMNS` select §6.1 uses (`.eq('slug', slug).single()` in place of the cursor/limit chain) — `agent:agent_directory(agent_id, agency_id, full_name, avatar_url, job_title, bio)`, not a raw `agents`/`profiles` join (corrected 2026-07-27, Sprint 4 — the `agents`/`profiles` join in this line's earlier draft predated the `agent_directory` view Sprint 3 actually built and never matched the implementation). |
+| **Underlying call** | The same `PROPERTY_COLUMNS` select §6.1 uses (`.eq('slug', slug).single()` in place of the cursor/limit chain) — `agent:agent_directory(agent_id, agency_id, full_name, avatar_url, job_title, bio, agency_name)`, not a raw `agents`/`profiles` join (corrected 2026-07-27, Sprint 4 — the `agents`/`profiles` join in this line's earlier draft predated the `agent_directory` view Sprint 3 actually built and never matched the implementation; `agency_name` added 2026-08-05). |
 | **Response Schema** | `Property` (full shape, §3.1) |
 | **Permissions** | Public, subject to the same visibility rule as §6.1. |
 | **Errors** | `PROPERTY_NOT_FOUND` |
 | **Pagination** | N/A (single resource). |
-| **View count** | `properties.view_count` (§5.8) is **not** incremented by this endpoint — built instead as its own call (Sprint 6, `AGENT-008`): `propertyRepository.incrementViewCount(id)` → `supabase.rpc('increment_property_view_count', { p_property_id: id })`, `security definer` since RLS can't scope a single-column update and both guests and customers view details (`execute` granted to `anon, authenticated`). Fired once via `useTrackPropertyView`'s `useEffect` on `PropertyDetailPage` mount, deliberately **not** folded into this endpoint's own query — a TanStack Query refetch/refocus on the same slug would otherwise double-count. Errors are swallowed client-side (no user-facing state depends on this call succeeding), but the Repository method itself still surfaces a real `AppError` so it stays unit-testable. |
+| **View count** | `properties.view_count` (§5.8) is **not** incremented by this endpoint — built instead as its own call (Sprint 6, `AGENT-008`): `propertyRepository.incrementViewCount(id)` → `supabase.rpc('increment_property_view_count', { p_property_id: id })`, `security definer` since RLS can't scope a single-column update and both guests and customers view details (`execute` granted to `anon, authenticated`). Fired once via `useTrackPropertyView`'s `useEffect` on `PropertyDetailPage` mount, deliberately **not** folded into this endpoint's own query — a TanStack Query refetch/refocus on the same slug would otherwise double-count. Errors are swallowed client-side (no user-facing state depends on this call succeeding), but the Repository method itself still surfaces a real `AppError` so it stays unit-testable. **Correction, 2026-08-05:** this row described the intended design correctly, but `useTrackPropertyView` was never actually written — `PropertyDetailPage` never called it, so `view_count` genuinely never incremented from real traffic since Sprint 6. Found while answering a developer question about how view counting works, and built to this row's own already-correct spec (`features/property-details/hooks/useTrackPropertyView.ts`), with `sessionStorage`-keyed dedup as the concrete mechanism behind "would otherwise double-count." |
 
 ## 6.3 Search Properties
 

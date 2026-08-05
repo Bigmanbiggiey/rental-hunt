@@ -903,13 +903,13 @@ Every story includes:
 ## CONTENT-001
 **Priority:** Medium
 **Epic:** Static & Legal Content
-**Title:** About / How It Works Page
+**Title:** About / How It Works (merged into the homepage)
 
 **User Story:** As a guest, I want to learn what Rental Hunt KE is and how it works, so that I can trust the platform before creating an account.
 
 **Acceptance Criteria:**
-- A public `/about` route renders the platform's mission and a "how it works" walkthrough (search → compare → book a viewing).
-- Reachable from the site footer, which currently has no navigation links.
+- The homepage (`/`) renders a "how it works" walkthrough (search → compare → book a viewing), between the hero and the featured listings.
+- **Reworked 2026-08-05:** originally built as a standalone `/about` route (2026-08-05); the developer asked for it to be merged into the homepage instead and the separate route removed — `SearchHero` already covered the platform's mission/tagline and trust badges a dedicated About page would otherwise repeat, so only the "how it works" content was genuinely new and worth keeping.
 - Fully static content — no new schema or API contract.
 
 ---
