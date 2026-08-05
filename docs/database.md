@@ -327,15 +327,21 @@ Conventions used throughout this section:
 | `phone` | `text` | Yes | Public contact number. |
 | `email` | `text` | Yes | Public contact email. |
 | `county_id` | `uuid` | Yes | Headquarters county. |
-| `is_active` | `boolean` | No | Default `true`. |
+| `is_active` | `boolean` | No | Default `true`. Purely "publicly visible right now" — distinct from `onboarding_status` below. |
+| `social_links` | `jsonb` | No | Default `{}`. Optional `facebook`/`instagram`/`twitter`/`linkedin`/`website` keys (Epic 12). Shape validated at the Zod layer, not a DB constraint. |
+| `onboarding_status` | `agency_onboarding_status` | No | Default `approved` (Epic 12, added 2026-08-05). `pending_review` \| `approved` \| `rejected`. Existing admin-created agencies backfill to `approved` via this default; a self-registered one starts `pending_review`. |
+| `applied_by` | `uuid` | Yes | The customer who self-applied (Epic 12) — `null` for admin-created agencies. |
+| `rejection_reason` | `text` | Yes | Set only when `onboarding_status = 'rejected'` (Epic 12). |
 | `created_at` | `timestamptz` | No | Default `now()`. |
 | `updated_at` | `timestamptz` | No | Default `now()`, auto-updated. |
 | `deleted_at` | `timestamptz` | Yes | Soft-delete marker. |
 
 **Primary Key:** `id`
-**Foreign Keys:** `county_id` → `counties.id` (`ON DELETE SET NULL`).
+**Foreign Keys:** `county_id` → `counties.id` (`ON DELETE SET NULL`); `applied_by` → `profiles.id` (`ON DELETE SET NULL`).
 **Unique Constraints:** `slug`.
-**Indexes:** `slug` (unique, supports agency profile pages), `county_id`.
+**Indexes:** `slug` (unique, supports agency profile pages), `county_id`, `onboarding_status` (Epic 12 — the admin application queue filters on this).
+
+**Self-service onboarding (Epic 12, `supabase/migrations/20260805110000_agency_marketplace.sql`):** a new `agencies_insert_self` RLS policy lets an authenticated `customer` INSERT their own application, but a `BEFORE INSERT` trigger (`enforce_agency_onboarding_status()`) — not the client — decides the actual `onboarding_status`/`is_active`/`applied_by` values for that caller, forcing `pending_review`/`false`/`auth.uid()` regardless of what was sent (mirrors `enforce_verification_authority()`'s "the trigger is the real backstop" precedent, §9 below). Admin's own pre-existing create path (`agencies_insert_admin`) is untouched — the trigger only narrows a `'customer'` caller. Two `security definer` RPCs, `approve_agency_application(agency_id)`/`reject_agency_application(agency_id, reason)` (admin-only — Agencies management has never included moderator), move an application out of `pending_review`; approval also promotes the applicant's `profiles.role` to `agent` and inserts their `agents` row in the same transaction — the only path in this codebase that creates an `agents` row outside of a raw admin/seed insert.
 
 ---
 
@@ -669,6 +675,41 @@ Conventions used throughout this section:
 
 ---
 
+## 5.17 `reviews`
+
+**Purpose:** Epic 12 (`user-stories.md`, added 2026-08-05) — promotes §15's long-deferred "Reviews" sketch to a real table. A customer's rating/comment on a completed `viewing_requests` row, publicly visible as the platform's trust signal for both an agency and its individual agents.
+
+| Column | Type | Nullable | Description |
+|---|---|---|---|
+| `id` | `uuid` | No | Primary key. |
+| `customer_id` | `uuid` | No | The reviewer. |
+| `viewing_request_id` | `uuid` | No | The completed viewing this review is about. Unique — one review per booking, and doubles as the eligibility gate. |
+| `agency_id` | `uuid` | No | **Trigger-derived, never client-supplied** — resolved from `viewing_request_id`'s property at write time. |
+| `agent_id` | `uuid` | Yes | Trigger-derived, same as above. Nullable so a review survives an agent later becoming inactive. |
+| `property_id` | `uuid` | Yes | Trigger-derived, same as above. Contextual only — not required for rating aggregation. |
+| `rating` | `smallint` | No | `CHECK (rating BETWEEN 1 AND 5)`. |
+| `comment` | `text` | Yes | Optional free text. |
+| `created_at` | `timestamptz` | No | Default `now()`. |
+| `updated_at` | `timestamptz` | No | Default `now()`, auto-updated. |
+| `deleted_at` | `timestamptz` | Yes | Soft-delete marker (§2) — an admin moderates by setting this via `UPDATE`, not a raw `DELETE`. |
+
+**Primary Key:** `id`
+**Foreign Keys:** `customer_id` → `profiles.id` (`ON DELETE CASCADE`); `viewing_request_id` → `viewing_requests.id` (`ON DELETE CASCADE`); `agency_id` → `agencies.id` (`ON DELETE CASCADE`); `agent_id` → `agents.id` (`ON DELETE SET NULL`); `property_id` → `properties.id` (`ON DELETE SET NULL`).
+**Unique Constraints:** `viewing_request_id`.
+**Indexes:** partial `agency_id`/`agent_id` (both `WHERE deleted_at IS NULL` — the public rating-summary/list queries), `customer_id`.
+
+**Eligibility is enforced by a trigger, not RLS/client input alone** — the same "RLS/client input alone isn't reliably sufficient" lesson this project already learned twice (the `properties`/`favorites` guest-visibility OR-combination gap above, and `prevent_booking_unavailable_property()`). A `BEFORE INSERT OR UPDATE` trigger, `enforce_review_eligibility()`, looks up the target `viewing_request`, rejects (raising a dedicated errcode, `RH003`) unless it belongs to the calling customer and is `status = 'completed'`, and — on every insert/update — (re)derives `agency_id`/`agent_id`/`property_id` from that viewing request itself, overwriting whatever the client sent. `viewing_request_id`/`customer_id` are treated as immutable after creation (the trigger also rejects any attempt to change either on `UPDATE`). The unique constraint on `viewing_request_id` gives "one review per booking" as a standard `23505` conflict, no custom code needed.
+
+**Write path:** `reviews_select_all` (`deleted_at IS NULL`) is guest-visible, same shape as verified-property visibility — this is the whole point of a public trust signal. `reviews_insert_own_customer`/`reviews_update_own_customer` scope writes to the caller's own row (`current_role() = 'customer' AND customer_id = auth.uid()`); `reviews_update_admin` lets admin moderate (soft-delete) any row. No role has a raw `DELETE` grant.
+
+**Two plain (`security_invoker`) aggregate views**, not security-definer (`reviews` is already fully public-readable, unlike `agent_directory`'s need to expose otherwise-private `profiles` data):
+- `agency_rating_summary (agency_id, average_rating, review_count)`
+- `agent_rating_summary (agent_id, average_rating, review_count)`
+
+Both `group by` over non-deleted rows; a brand-new agency/agent with zero reviews simply has no row in the view (repository maps that to `{ averageRating: null, reviewCount: 0 }`, not a `0.0` average).
+
+---
+
 # 6. Enumerations
 
 Enums are used for small, fixed, code-coupled state machines. Reference data that may grow or be edited by admins (property types, counties, locations, amenities) intentionally uses tables instead — see §2, principle 8, and the rationale in §4.4.
@@ -701,7 +742,13 @@ CREATE TYPE viewing_status AS ENUM ('pending', 'confirmed', 'completed', 'cancel
 ```
 Matches `requirements.md` §8.2 exactly.
 
-No additional enums are introduced. Property type, county, and amenity "enumerations" are deliberately implemented as reference tables (§4.4, §5.5–5.7, §5.10) rather than PostgreSQL enums, since they need to be extensible by admins without a schema migration.
+### `agency_onboarding_status`
+```sql
+CREATE TYPE agency_onboarding_status AS ENUM ('pending_review', 'approved', 'rejected');
+```
+Epic 12, added 2026-08-05 — separate from `agencies.is_active` (§5.3), which stays purely "publicly visible right now." Existing admin-created agencies default/backfill to `approved`.
+
+No other additional enums are introduced. Property type, county, and amenity "enumerations" are deliberately implemented as reference tables (§4.4, §5.5–5.7, §5.10) rather than PostgreSQL enums, since they need to be extensible by admins without a schema migration.
 
 ---
 
@@ -727,6 +774,10 @@ No additional enums are introduced. Property type, county, and amenity "enumerat
 | `properties` | 1 → Many | `property_verifications` | Full verification history per property (§5.15). |
 | `profiles` (moderator/admin) | 1 → Many | `property_verifications` | A reviewer can perform many verification reviews over time. |
 | `roles` | — | `profiles` | **Not** FK-enforced; `roles` mirrors the `user_role` enum for display only (§2, §6). |
+| `viewing_requests` | 1 → 1 | `reviews` | Unique on `viewing_request_id` — at most one review per completed viewing (§5.17, Epic 12). |
+| `agencies` | 1 → Many | `reviews` | Trigger-derived from the viewing request's property, never client-supplied. |
+| `agents` | 1 → Many | `reviews` | Same derivation; nullable so a review survives an agent later becoming inactive. |
+| `profiles` (customers) | 1 → Many | `reviews` | A customer can leave many reviews over time (one per completed viewing). |
 
 ```mermaid
 erDiagram
@@ -764,6 +815,8 @@ erDiagram
 | Favorites | Composite PK `(customer_id, property_id)` | Covers "my favorites" (`FAV-003`) directly; a secondary index on `property_id` supports popularity aggregation. |
 | Audit | `activity_logs (entity_type, entity_id)`, `activity_logs.created_at` | Entity history lookups and time-windowed retention/export queries. |
 | Verification history | `property_verifications.property_id`, `property_verifications.reviewed_by`, `property_verifications.created_at` | Per-property history, per-moderator throughput reporting, and time-to-verify analytics (§5.15). |
+| Agency applications | `agencies.onboarding_status` | The admin application queue filters on this (Epic 12). |
+| Reviews | Partial `reviews.agency_id`/`reviews.agent_id` (both `WHERE deleted_at IS NULL`), `reviews.customer_id` | The Agency Profile Page's rating-summary/review-list queries and "my reviews" (Epic 12, §5.17). |
 
 ---
 
@@ -819,7 +872,7 @@ end if;
 |---|---|---|---|---|---|
 | `profiles` | No access | SELECT/UPDATE own row only (`role` column excluded — see trigger note below) | Same as Customer, **plus** (Sprint 6, BOOK-001) SELECT any customer's row for a `viewing_requests` the agent is assigned to | SELECT all | SELECT/UPDATE all, INSERT/DELETE (deactivation) |
 | `roles` | SELECT (public reference) | SELECT | SELECT | SELECT | SELECT, INSERT/UPDATE/DELETE |
-| `agencies` | SELECT (`is_active = true`) | SELECT | SELECT all; UPDATE own agency's non-critical fields (`description`, `logo_url`, `phone`, `email`) | SELECT all | Full CRUD |
+| `agencies` | SELECT (`is_active = true`) | SELECT; **plus** (Epic 12) INSERT own self-service application (`applied_by = auth.uid()`, trigger-forced to `pending_review`/inactive), SELECT own application regardless of `is_active` | SELECT all; UPDATE own agency's non-critical fields (`description`, `logo_url`, `phone`, `email`, `social_links`) | SELECT all | Full CRUD; **plus** (Epic 12) `approve_agency_application()`/`reject_agency_application()` RPCs — the only path, admin-only, not moderator |
 | `agents` | SELECT (public directory fields via a view) | SELECT | SELECT all; UPDATE own row (`bio`, `job_title`) | SELECT all | Full CRUD |
 | `counties` / `property_types` | SELECT | SELECT | SELECT | SELECT | Full CRUD |
 | `locations` | SELECT | SELECT | SELECT, **plus INSERT** (`locations_insert_agent`, post-Sprint-8 — the property form's Location field can create a new neighborhood on the fly; UPDATE/DELETE stay admin-only via `locations_manage_admin`) | SELECT | Full CRUD |
@@ -832,6 +885,7 @@ end if;
 | `activity_logs` | No access | No access | No access (agents do not read the audit trail in MVP) | SELECT | SELECT; DELETE for retention/GDPR purposes only |
 | `property_verifications` | No access | No access | SELECT for own agency's properties (transparency into why a listing was verified/rejected) | SELECT all | SELECT all; `INSERT` only via the `set_property_verification()` RPC — no role has a direct table `INSERT`/`UPDATE`/`DELETE` grant, including admin |
 | `contact_messages` | INSERT own submission only (`user_id IS NULL`) | INSERT own submission only (`user_id = auth.uid()`, enforced) | No access (not a support/admin role) | No access (admin-only triage, not verification/activity oversight) | Full CRUD |
+| `reviews` | SELECT (`deleted_at IS NULL`) | Same as Guest, **plus** INSERT/UPDATE own rows only (eligibility enforced by trigger, §5.17) | SELECT (`deleted_at IS NULL`) — the same public visibility, no elevated access | SELECT (`deleted_at IS NULL`) | SELECT all (including soft-deleted); UPDATE any row (moderation soft-delete) — no raw `DELETE` grant to any role |
 
 **Column-level note on `profiles.role`:** RLS cannot restrict a single column within a row-level `UPDATE` policy, so self-role-elevation is prevented by a trigger (`prevent_self_role_change()`) that raises an exception if a non-admin attempts to change their own `role`. Admins bypass the trigger.
 
@@ -980,11 +1034,14 @@ A future `subscriptions` table on `agencies` (`agency_id`, `plan`, `status`, `re
 ## Notifications
 A future `notifications` table (`profile_id`, `type`, `channel`, `payload jsonb`, `read_at`, `created_at`) would formalize delivery of the preferences already modeled in `profiles.notification_preferences`, and would be the natural home for push tokens if native mobile apps (`FUT-006`) are built.
 
-## Reviews
-A future `reviews` table (`customer_id`, `property_id` and/or `agent_id`, `rating`, `comment`, `created_at`) would attach to completed `viewing_requests` (a review only makes sense after `status = 'completed'`), reusing the existing lifecycle rather than inventing a new one.
+## Reviews — built, 2026-08-05 (Epic 12)
+**No longer future work.** The sketch here (`customer_id`, `property_id`/`agent_id`, `rating`, `comment`, `created_at`, attached to a completed `viewing_requests` row) turned out to be exactly right and is now real — see §5.17. Kept as a heading here only so this section's history isn't silently erased; the live spec is §5.17, not this paragraph.
 
-## Multi-Agency Support
-The `agencies` → `agents` → `properties` structure already models agencies as first-class entities. The only change required for `FUT-004` (an agent working across multiple agencies) is replacing `agents.agency_id` with a join table `agent_agencies (agent_id, agency_id)` — an additive change, not a redesign.
+## Agency Self-Service Onboarding — built, 2026-08-05 (Epic 12)
+**No longer future work.** `FUT-002`'s "agency onboarding is additive UI, not a schema change" prediction held — see §5.3's `onboarding_status`/`applied_by`/`rejection_reason` columns and the `agencies_insert_self` policy. `FUT-004` (an agent working across *multiple* agencies simultaneously) remains genuinely deferred and is unrelated — see below.
+
+## Multi-Agency Support (still deferred)
+The `agencies` → `agents` → `properties` structure already models agencies as first-class entities. The only change required for `FUT-004` (an agent working across multiple agencies *at once*) is replacing `agents.agency_id` with a join table `agent_agencies (agent_id, agency_id)` — an additive change, not a redesign. Not to be confused with the Agency Self-Service Onboarding item above, which is already built and solves a different problem (how an agency itself gets created).
 
 ## AI Recommendations
 `FUT-005` would consume existing data (`favorites`, `viewing_requests`, `activity_logs` search events) as training/inference input; a future `recommendations` cache table (`customer_id`, `property_id`, `score`, `generated_at`) would store model output without touching the source tables.
@@ -1013,7 +1070,8 @@ The `agencies` → `agents` → `properties` structure already models agencies a
 | Search | Native PostgreSQL (composite + GIN indexes), Meilisearch deferred | Matches `architecture.md` §13 exactly; keeps the MVP infrastructure footprint minimal. |
 | Pagination | Keyset pagination recommended for the public search feed; offset acceptable for small bounded lists | Keyset avoids `OFFSET`'s linear degradation on the highest-traffic query in the app. |
 | Migrations | Supabase CLI, forward-only, PITR as the rollback backstop | Standard Supabase workflow; avoids fragile hand-written down-migrations. |
-| Multi-agency, payments, subscriptions, notifications, reviews | Explicitly deferred; sketched in §15 only | Matches `vision.md`'s "Out of Scope" list and this task's constraints — the MVP schema is additive-ready but does not implement them. |
+| Multi-agency (`FUT-004`), payments, subscriptions, notifications | Explicitly deferred; sketched in §15 only | Matches `vision.md`'s "Out of Scope" list and this task's constraints — the MVP schema is additive-ready but does not implement them. |
+| Reviews & agency self-service onboarding | Built 2026-08-05 (Epic 12), ahead of their original deferred placement | Explicit developer decision (`decisions.md` ADR-035) to build now rather than post-`v1.0.0` — see §5.3/§5.17. |
 
 ---
 

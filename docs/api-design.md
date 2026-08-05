@@ -1093,7 +1093,8 @@ Every Repository method either resolves with a `{ success: true, data, meta? }` 
 | `PROPERTY_NOT_FOUND` / `AGENCY_NOT_FOUND` / `VIEWING_REQUEST_NOT_FOUND` / `PROFILE_NOT_FOUND` / `IMAGE_NOT_FOUND` | Not Found | Resource-specific 404 equivalents. |
 | `EMAIL_ALREADY_REGISTERED` | Conflict | Registration with a duplicate email. |
 | `PROPERTY_NOT_AVAILABLE` | Conflict | Attempted to book a property that isn't `available` (§8.2). |
-| `INVALID_STATE_TRANSITION` | Conflict | Attempted an illegal `viewing_requests.status` transition (§8.1). |
+| `INVALID_STATE_TRANSITION` | Conflict | Attempted an illegal `viewing_requests.status` transition (§8.1); also reused for an agency application that isn't `pending_review` anymore (Epic 12, §25.2). |
+| `REVIEW_NOT_ELIGIBLE` | Conflict | Attempted to review a viewing request that isn't the caller's own `completed` booking (Epic 12, §25.3). |
 | `RATE_LIMITED` | Throttling | See §18. |
 | `STORAGE_ERROR` | Infrastructure | Supabase Storage upload/delete failure. |
 | `DATABASE_ERROR` | Infrastructure | An unmapped Postgres error surfaced through PostgREST. |
@@ -1119,6 +1120,8 @@ This mapping table lives in exactly one shared utility (`mapSupabaseError()`), u
 **`viewingRequestRepository.cancel(id, reason?)`'s not-found case (added Sprint 5):** RLS's `viewing_requests_cancel_own_customer` policy scopes the `UPDATE` to the caller's own rows while `status IN ('pending','confirmed')` — a 0-rows-affected result (PostgREST `PGRST116`) can mean either "not your request" or "already in a terminal state," and RLS deliberately can't distinguish the two (same non-leaking reasoning as `profile.rls.test.ts`'s own-row policies). This normalizes to `INVALID_STATE_TRANSITION`, not `VIEWING_REQUEST_NOT_FOUND` — the Cancel button is only ever shown on a request the customer can already see, so a real hit here is stale client state, not an ownership violation.
 
 **`set_property_verification()`'s not-found case (added Sprint 7):** raises a plain PL/pgSQL `P0002` (`no_data_found`, a standard SQLSTATE) for a nonexistent `property_id` — `mapSupabaseError()` maps `P0002` directly to `PROPERTY_NOT_FOUND`. Considered a new `RH003` custom errcode for the RPC's other failure case ("reason required when rejecting") and deliberately did not add one: that case already raises a standard `23514` (`check_violation`), which already maps to `VALIDATION_ERROR` — the Service-layer Zod schema (`VerificationActionSchema`) catches it first in the normal path regardless, so the DB check is only ever a rare backstop, not a case the frontend needs to distinguish with its own dedicated code the way `RH001`/`RH002` genuinely did.
+
+**`enforce_review_eligibility()`'s rejection (Epic 12, added 2026-08-05):** raises with a dedicated errcode, `RH003` — continuing the `RH001`/`RH002` sequence, since this is exactly the kind of case those two were reserved for (a rejection the frontend genuinely needs to distinguish with its own code, not a generic `23514`/`P0002`). Mapped to `REVIEW_NOT_ELIGIBLE`. `approve_agency_application()`/`reject_agency_application()`'s "not pending anymore" case reuses the existing `RH002` → `INVALID_STATE_TRANSITION` mapping rather than adding a fourth code, since it's semantically identical to that RPC's original use.
 
 **Client-side logging (Sprint 7, `coding-standards.md` §22):** this is a frontend-only SPA with no server tier, so "logged server-side with full detail" above means `shared/lib/logger.ts` — the single logging call site every `console.warn`/`console.error` funnels through (enforced by the `no-console` ESLint rule). `mapSupabaseError()` calls `logger.error()` for the genuinely unexpected `DATABASE_ERROR`/`UNEXPECTED_ERROR` fallthrough cases only (never for expected outcomes like `VALIDATION_ERROR`/`FORBIDDEN`/a resource-specific not-found), with a Postgres errcode or error type in `meta` — never PII. `shared/ui/route-error-boundary.tsx`'s `RouteErrorBoundary` (the one sanctioned class-component exception, `coding-standards.md` §7) does the same for render-time errors, wrapping each top-level layout's `<Outlet/>`/`children`. No Sentry-style integration yet — both are the documented drop-in hook point for one later.
 
@@ -1315,6 +1318,62 @@ Added 2026-08-05 (`CONTENT-002`/`003`, `user-stories.md` Epic 11; `database.md` 
 8. **Keep business logic in Services, not Repositories or Components.** Repositories only perform data access and error normalization; Services own validation orchestration, permission-adjacent UX decisions ("is this transition even worth attempting"), and multi-step workflows (e.g. upload image → create metadata row, §10.1).
 9. **Verification-status and availability-guarded writes go through the documented RPCs** (`set_property_verification`, the booking-availability trigger) — never a direct `UPDATE`/`INSERT` on `properties`/`viewing_requests` for those specific fields, even from a Service, since RLS and triggers are the actual authority (§2.2, `database.md` §9).
 10. **Every new endpoint gets a corresponding entry in this document** (route, repository function, request/response shape, permissions, errors) in the same change that implements it — this document decays the moment implementation outruns it.
+
+---
+
+# 25. Agency Marketplace API
+
+Added 2026-08-05 (`user-stories.md` Epic 12; `database.md` §5.3/§5.17; `decisions.md` ADR-035/ADR-036) — self-service agency onboarding, the public Agency Profile Page, and reviews/ratings, built ahead of `FUT-002`'s original deferred placement.
+
+## 25.1 Apply For Agency (Self-Service)
+
+| | |
+|---|---|
+| **Method / Route** | `POST /agencies` (self-service variant) |
+| **Repository Function** | `agencyRepository.applySelf(input: ApplyForAgencyInput): Promise<Agency>` (`entities/agency`) |
+| **Permissions** | Customer only (RLS `agencies_insert_self`). |
+| **Validation** | Zod at the Service layer (`features/agency-registration`): same shape as admin's `CreateAgencySchema` plus `socialLinks` (each key an optional URL). |
+| **Notes** | `onboardingStatus`/`isActive`/`appliedBy` are never part of the input — `enforce_agency_onboarding_status()` (`database.md` §5.3) forces `pending_review`/`false`/`auth.uid()` server-side regardless of what's sent. |
+| **Errors** | `VALIDATION_ERROR` |
+
+## 25.2 Approve / Reject Agency Application (Admin)
+
+| | |
+|---|---|
+| **Method / Route** | `POST /agencies/:id/approve`, `POST /agencies/:id/reject` |
+| **Repository Function** | `agencyRepository.approve(id): Promise<Agency>` / `agencyRepository.reject(id, reason): Promise<Agency>` (`entities/agency`), wrapping the `approve_agency_application()`/`reject_agency_application()` RPCs. |
+| **Permissions** | Admin only — not moderator (Agencies management has never been part of the moderator route group). |
+| **Notes** | Approval is atomic: activates the agency, promotes the applicant's `profiles.role` to `agent`, and inserts their `agents` row in the same RPC transaction. Reject requires a non-blank `reason`. |
+| **Errors** | `FORBIDDEN`, `INVALID_STATE_TRANSITION` (application isn't `pending_review` anymore, reused from §8's `RH002`), `VALIDATION_ERROR` (reject with no reason). |
+
+## 25.3 Reviews
+
+| | |
+|---|---|
+| **Method / Route** | `POST /reviews`, `GET /agencies/:id/reviews`, `GET /agencies/:id/rating-summary`, `GET /agents/:id/rating-summary` |
+| **Repository Function** | `reviewRepository.create(input)`, `.listForAgency(agencyId, page?, pageSize?)`, `.listForAgent(agentId, page?, pageSize?)`, `.getAgencyRatingSummary(agencyId)`, `.getAgentRatingSummary(agentId)` (`entities/review`) |
+| **Permissions** | Create: Customer only, own row, own completed viewing. List/summary: everyone, including guests (`deleted_at IS NULL` rows only). |
+| **Validation** | Zod at the Service layer (`features/reviews`): `rating` integer 1–5, `comment` optional (max 2000 chars). `viewingRequestId` is the only trust-relevant input — `agencyId`/`agentId`/`propertyId` are never accepted from the client; `enforce_review_eligibility()` (`database.md` §5.17) derives them server-side. |
+| **Pagination** | Offset (§16.2), 10 rows per page — same convention as the new admin drill-down lists below. |
+| **Errors** | `VALIDATION_ERROR`, `REVIEW_NOT_ELIGIBLE` (`RH003` — not the caller's own completed viewing), `CONFLICT` (already reviewed this viewing — `23505` on `viewing_request_id`'s unique constraint). |
+
+## 25.4 Agency Profile Page's Property/Agent Lists
+
+| | |
+|---|---|
+| **Method / Route** | `GET /properties?agencyId=:id` (reuses the public feed), `GET /agencies/:id/agents` |
+| **Repository Function** | `propertyRepository.list({ agencyId }, cursor?, limit?)` — `agencyId` is simply a new optional filter on the existing public method, not a separate one, so it inherits all of `list()`'s cursor/sort/amenity/search logic for free (`entities/property`). `agentRepository.listByAgency(agencyId)` reads the `agent_directory` security-definer view (`database.md` §9), not the raw `agents` table — guests have no direct SELECT grant there. |
+| **Permissions** | Public — same guest-visibility rules as the main search feed / `PROP-005`'s Agent Card. |
+| **Pagination** | Properties: cursor (§16.1), matching the main feed. Agents: unpaginated (an agency's active agent count is small; add pagination only if that assumption stops holding). |
+
+## 25.5 Admin Overview Drill-Downs
+
+| | |
+|---|---|
+| **Method / Route** | `GET /admin/properties`, `GET /admin/bookings` |
+| **Repository Function** | `propertyRepository.listAllAdmin(page?, pageSize?)`, `viewingRequestRepository.listAllAdmin(page?, pageSize?)` — unscoped by agency, mirroring `getByIdAdmin()`'s existing precedent that admin/moderator RLS already grants full visibility. |
+| **Permissions** | Admin/moderator (RLS `properties_select_all_moderator_admin`, admin/moderator "SELECT all" on `viewing_requests`). |
+| **Pagination** | Offset (§16.2), 10 rows per page (per the Admin Overview stat cards' own drill-down requirement — deliberately not matching `AdminActivityLogPage`'s pre-existing 20-per-page, since this was an explicit, separate instruction). |
 
 ---
 

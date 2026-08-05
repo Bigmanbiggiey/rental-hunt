@@ -593,6 +593,8 @@ Maps `properties.verification_status` (`database.md` §6):
 
 **Tile-load failures (added 2026-08-05):** a small inline note ("Some map tiles failed to load. Check your connection.") appears if OpenStreetMap's tile server fails, mirroring §12.11.1's existing location-search error-message convention.
 
+**Stacking context (added 2026-08-05, mobile booking-flow review):** Leaflet's own CSS gives its zoom control `z-index: 1000` — high enough to render on top of a `z-50` Dialog (§11.10) once both are visible on a mobile viewport where the map is more likely to be scrolled into view when "Book a Viewing" is tapped. The map's outer wrapper carries `isolation: isolate` (Tailwind's `isolate` class) so Leaflet's internal z-index values are permanently contained inside it, never able to outrank an ancestor-level Dialog/Sheet regardless of what else is added later. Applied to both this map and §12.11.1's picker.
+
 ## 12.11.1 Location Picker (property form)
 
 **Purpose:** Let an agent set a listing's exact `latitude`/`longitude` visually (post-Sprint-8) instead of only typing raw coordinates — same Leaflet/OpenStreetMap stack as §12.11's read-only map, no new mapping dependency.
@@ -629,6 +631,26 @@ Maps `properties.verification_status` (`database.md` §6):
 
 **Behavior:** Clicking "Review" in the Verification Queue table/card (§13.2) navigates to a dedicated page (`/admin-dashboard/verification-queue/:id`, and the moderator-dashboard equivalent) rather than opening a dialog. Reuses the exact same component set and order as the public Property Details Layout (§12.4) — Gallery → Title/Price/Verification Badge → bed/bath/type → Location + Map → Description → Amenities Grid → Agent Card — so a reviewer sees precisely what a guest would eventually see, field for field. The decision surface (reason field + Reject/Approve) is a fixed action bar at the bottom of the page (`VerificationActionBar`), sticky on mobile / in-flow at the bottom of content on `sm:` and up — the same breakpoint pattern as the Viewing CTA (§12.14) — rather than a separate modal. A reason is required to reject (§6.9's existing rule); approving needs none. On success, returns to the queue.
 
+## 12.15 Rating (Epic 12, added 2026-08-05)
+
+**Purpose:** A read-only star display for an agency's or agent's aggregate rating (`reviews.rating`, `database.md` §5.17) — the first component of its kind in this design system.
+
+**Behavior:** Five `lucide-react` `Star` icons, filled proportionally to the nearest half-star of the average (a `4.5` shows four full stars and one half-filled); filled state uses the `warning` color token (matching the existing star-rating convention of amber/gold, not `primary`), empty state a muted `40%`-opacity outline. The numeric average (one decimal place) and review count render alongside the stars as real text, not just implied by the icons. The whole control carries a single `role="img"` with a full-sentence `aria-label` ("Rated 4.5 out of 5 from 12 reviews") — the stars themselves are `aria-hidden`, so a screen reader never has to count filled/half/empty icons one by one. Zero reviews renders "No reviews yet," not a misleading `0.0`/empty-star row.
+
+**Where used:** Agency Profile Page header (§12.16) and each agent listed there; a review's own single-rating display in the Reviews section (rendered the same way, with `reviewCount` fixed at 1).
+
+## 12.16 Agency Profile Page (Epic 12, added 2026-08-05)
+
+**Purpose:** A public, guest-reachable page (`/agencies/:slug`) showing an agency's identity, trust signal, and current inventory — mirrors the Property Details Layout's (§12.4) "give a guest everything they need to decide, on one page" philosophy, one level up the trust hierarchy (agency, not listing).
+
+**Anatomy, top to bottom:**
+1. **Header** — logo (Avatar, §11.8, falling back to initials), name, Rating (§12.15), description, contact info (phone/email), and social-link icons (only the ones actually set — `lucide-react`'s `Facebook`/`Instagram`/`Twitter`/`Linkedin`/`Globe`).
+2. **Agents section** — a card grid, each agent's name, job title, and their own Rating (§12.15) — distinct from the agency-level one above.
+3. **Properties section** — the same `PropertyCard` grid and cursor-paginated "Load more" pattern as the public search feed (§12.1), scoped to this one agency.
+4. **Reviews section** — a paginated (offset, 10/page) list of reviews (rating + optional comment + date, labeled "Verified renter" rather than a name — no reviewer identity is exposed, `database.md` §5.17's own note on why), with a "Write a review" entry point surfaced instead from the customer's own booking history (§12.10) once a booking is `completed`, not from this page directly.
+
+**Admin's existing Agencies table** (§13.2) links each agency's name to this same public page — reused as-is rather than forking a separate admin-only view.
+
 ---
 
 # 13. Dashboard Components
@@ -641,11 +663,15 @@ Shared across the Agent Dashboard (`AGENT-001`–`AGENT-008`, `BOOK-001`–`BOOK
 
 **Anatomy:** Label (Text Secondary, small) + large numeric value (H2, Text Primary) + optional trend/comparison caption (Text Muted) + optional icon. Laid out in the responsive grid from §7.2.
 
+**Admin Overview drill-downs (Epic 12, added 2026-08-05):** each of the Admin Overview's four stat cards is a `Link` to a browsable list of the underlying records, not a static number — a hover border (`hover:border-ring/50`) is the only visual change from the non-clickable version, keeping the anatomy above unchanged. Two of the four ("Total properties," "Bookings this week") link to new admin screens built specifically for this; the other two ("Pending verifications," "Active agencies") link to their pre-existing screens.
+
 ## 13.2 Tables
 
 **Purpose:** Dense, scannable lists (property management, booking requests) on screens ≥ `lg`.
 
 **Rules:** Sticky header row on scroll; row hover highlight (`accent` background); status columns always render as Badges (§11.7), never raw enum text; row-level actions live in a trailing Dropdown Menu (§11.12), not inline icon clutter. Below `lg`, tables convert to a stacked Card list (§16) — a raw HTML table is never horizontally scrolled on mobile as the primary pattern.
+
+**Page size (Epic 12, added 2026-08-05):** the Admin Overview's new drill-down lists (§13.1) use 10 rows per page, a deliberate, explicit instruction distinct from `AdminActivityLogPage`'s pre-existing 20 — new bounded lists don't need to match an older screen's page size just for consistency's sake when a different one was explicitly requested.
 
 ## 13.3 Filters
 
@@ -669,7 +695,7 @@ The homepage hero search (`DISC-002`) is large (`lg` Input, prominent placement)
 
 ## 13.7 Sidebar
 
-See §7.3 for widths/breakpoint behavior. Contains: logo/agency mark, primary nav links (Overview, Properties, Bookings, Analytics), and a bottom-anchored user/account section.
+See §7.3 for widths/breakpoint behavior. Contains: logo/agency mark, primary nav links (Overview, Properties, Bookings, Analytics), and — below a divider, deliberately separated from the role's own functional nav links, not interleaved with them — a single "View site" link back to the public homepage (`ExternalLink` icon). **Correction (2026-08-05):** this section previously said "user/account section" here — the actual account controls (Profile, Logout) live in the User Menu in the top header (§13.9), not the sidebar; verified directly against `DashboardShell.tsx` while auditing this area for Epic 12, not assumed from the original prose.
 
 ## 13.8 Top Navigation
 
@@ -718,6 +744,8 @@ Applies to every form in the product: registration, login, password reset, booki
 ## 15.1 Desktop Navigation (≥ `lg`)
 
 A single persistent top bar: logo (left) → primary links (Browse Properties, [role-specific: Dashboard]) (center/left-aligned) → search affordance + auth/user actions (right). Public and authenticated states share the same bar; only the right-hand cluster changes (Login/Register vs. Favorites/Bookings/Avatar menu).
+
+**Documentation-drift fix (2026-08-05):** the "[role-specific: Dashboard]" link named above had never actually been built — every dashboard route group is its own self-contained shell (post-Sprint-8 restructuring) with no link back out to the public site's `Header`, so a signed-in admin/moderator/agent/customer browsing the public site (e.g. via each dashboard's own "View site" link, §15.4) had no way back except the browser's own back button. Closed by adding a role-keyed "Go to my dashboard" link next to the existing name/logout controls, in both `Header.tsx` and `MobileNavDrawer.tsx`.
 
 ## 15.2 Mobile Navigation (< `lg`)
 

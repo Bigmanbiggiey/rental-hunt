@@ -631,9 +631,30 @@ These features must not be implemented during the MVP unless the roadmap is form
 * AI chat assistant
 * AI property recommendations
 * Native iOS/Android apps
-* Multi-agency SaaS support
+* Multi-agency SaaS support (an agent working across *multiple* agencies at once — `FUT-004`; still deferred. Distinct from §17's Agency Marketplace, which keeps the existing one-agency-per-agent model and only adds *how* an agency itself gets created — self-service instead of admin-only.)
 * Subscription billing
 * Public API access
 * Property sales marketplace
+
+---
+
+# 17. Agency Marketplace Requirements (Added 2026-08-05)
+
+Appended rather than inserted mid-numbering, to avoid renumbering every cross-reference to §11–§16 elsewhere in this doc set. Ahead of `FUT-002`'s original deferred placement (§16) — a deliberate developer decision, see `docs/decisions.md` ADR-035. Full detail: `user-stories.md` Epic 12, `database.md` §5.3/new `reviews` table, `roadmap.md`'s new Sprint 9.
+
+### FR-AGENCY-001
+A signed-in customer can submit a self-service agency application (name, description, contact info, county, logo URL, social links). The application starts in a non-public, pending-review state regardless of client input.
+
+### FR-AGENCY-002
+An admin can approve or reject a pending agency application. Approval atomically activates the agency, promotes the applicant to the `agent` role, and creates their `agents` row. Rejection requires a reason.
+
+### FR-AGENCY-003
+A public, guest-reachable Agency Profile Page (`/agencies/:slug`) shows an agency's details, contact info, social links, aggregate rating, active property listings, and active agents (each with their own rating).
+
+### FR-AGENCY-004
+A customer may leave one rating (1–5) and optional comment per completed viewing request. The review's agency/agent/property association is derived server-side from the viewing request, never client-supplied. An admin can moderate (soft-remove) a review.
+
+### FR-AGENCY-005
+The Admin Overview's stat cards each link to a browsable, paginated (10 rows/page) list of the underlying records.
 
 This document serves as the single source of truth for the Rental Hunt KE MVP scope and engineering implementation.

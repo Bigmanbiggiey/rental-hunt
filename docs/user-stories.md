@@ -972,6 +972,85 @@ Every story includes:
 
 ---
 
+# Epic 12 - Agency Marketplace
+
+> Added 2026-08-05, ahead of `FUT-002`/`FUT-004`'s original deferred placement (Epic 10) and `ui-guidelines.md` §23's "public agency profile pages" note. This is a deliberate, explicit developer decision to build self-service agency onboarding, public agency profile pages, and a reviews/ratings system now rather than after `v1.0.0` — see `roadmap.md`'s new Sprint 9 and `decisions.md` ADR-035/ADR-036. Database support: `docs/database.md` §5.3 (`agencies` new columns), new `reviews` table, `agency_rating_summary`/`agent_rating_summary` views.
+
+## AGENCY-001
+**Priority:** High
+**Epic:** Agency Marketplace
+**Title:** Self-Service Agency Registration
+
+**User Story:** As a customer, I want to apply to register my own agency, so that I can start listing properties without waiting for an admin to create my agency first.
+
+**Acceptance Criteria:**
+- A signed-in customer can submit an application (name, description, contact info, county, logo URL, social links) from `/register-agency`.
+- The application always starts `onboarding_status = 'pending_review'` and is not publicly visible (`is_active = false`), regardless of what the client sends — enforced by a database trigger, not just the UI.
+- The applicant can see their own application's status (pending/approved/rejected, with a reason if rejected) on the same page.
+- A customer cannot apply on behalf of another user.
+
+---
+
+## AGENCY-002
+**Priority:** High
+**Epic:** Agency Marketplace
+**Title:** Admin Agency Application Review
+
+**User Story:** As an admin, I want to approve or reject a pending agency application, so that only real agencies join the platform.
+
+**Acceptance Criteria:**
+- The existing Agencies admin screen shows pending applications with Approve/Reject actions.
+- Approving an application atomically: activates the agency, promotes the applicant's role to `agent`, and creates their `agents` row.
+- Rejecting an application requires a reason, visible to the applicant.
+- Only the admin role may approve/reject — moderator does not have this capability (consistent with Agencies management already being admin-only).
+
+---
+
+## AGENCY-003
+**Priority:** High
+**Epic:** Agency Marketplace
+**Title:** Public Agency Profile Page
+
+**User Story:** As a guest, I want to view an agency's public profile, so that I can see who I'd be renting from, their contact details, and their current listings and agents.
+
+**Acceptance Criteria:**
+- `/agencies/:slug` shows the agency's name, description, logo, contact info, social links, and aggregate rating.
+- A "Properties" section lists the agency's active, guest-visible listings (same visibility rules as the public search feed), paginated.
+- An "Agents" section lists the agency's active agents, each with their own rating.
+- The existing admin Agencies table links each agency's name to this same public page.
+
+---
+
+## AGENCY-004
+**Priority:** Medium
+**Epic:** Agency Marketplace
+**Title:** Agency & Agent Reviews and Ratings
+
+**User Story:** As a customer, I want to leave a review and rating after a completed viewing, so that other renters can trust the agency and agent I dealt with.
+
+**Acceptance Criteria:**
+- A customer can review a viewing request only once it's `completed`, and only their own.
+- One review per completed viewing (enforced by the database, not just the UI).
+- A review's agency/agent/property association is derived from the viewing request itself, never entered by the customer.
+- The Agency Profile Page shows the agency's average rating and review count, and each listed agent's own average rating.
+- An admin can moderate (soft-remove) a review.
+
+---
+
+## AGENCY-005
+**Priority:** Medium
+**Epic:** Agency Marketplace
+**Title:** Admin Overview Drill-Downs
+
+**User Story:** As an admin, I want to click any Overview stat card and see the underlying records in a browsable list, so that I don't have to switch screens to investigate a number.
+
+**Acceptance Criteria:**
+- Each of the four Overview stat cards (Total properties, Pending verifications, Active agencies, Bookings this week) links to a real list.
+- "Total properties" and "Bookings this week" — previously unbuilt — now have their own admin screens, both offset-paginated 10 rows per page.
+- "Pending verifications" and "Active agencies" link to their existing screens, unchanged.
+
+---
+
 # MVP Scope Summary (Version 1.0)
 
 Per the [vision document](./vision.md#minimum-viable-product-mvp), the MVP validates a single hypothesis: people are willing to use a trusted digital platform to discover rental properties and book physical viewings.
@@ -987,8 +1066,9 @@ Per the [vision document](./vision.md#minimum-viable-product-mvp), the MVP valid
 | 7. Booking Management | ✅ Yes |
 | 8. Customer Dashboard | ✅ Yes |
 | 9. System Behavior | ✅ Yes (cross-cutting, applies to all epics above) |
-| 10. Future Enhancements | ❌ No — explicitly deferred |
+| 10. Future Enhancements | ❌ No — explicitly deferred (except `FUT-002`/`FUT-004`'s onboarding/multi-agency-page pieces, superseded early by Epic 12, 2026-08-05) |
 | 11. Static & Legal Content | ✅ Yes (folded into Sprint 9 pre-launch prep) |
+| 12. Agency Marketplace | ✅ Yes (added 2026-08-05, ahead of its original post-MVP placement — `roadmap.md`'s new Sprint 9) |
 
 ---
 
@@ -1061,6 +1141,11 @@ Per the [vision document](./vision.md#minimum-viable-product-mvp), the MVP valid
 | CONTENT-003 | Static & Legal Content | FR-CONTENT-003 |
 | CONTENT-004 | Static & Legal Content | FR-CONTENT-004 |
 | CONTENT-005 | Static & Legal Content | FR-CONTENT-005 |
+| AGENCY-001 | Agency Marketplace | FR-AGENCY-001 |
+| AGENCY-002 | Agency Marketplace | FR-AGENCY-002 |
+| AGENCY-003 | Agency Marketplace | FR-AGENCY-003 |
+| AGENCY-004 | Agency Marketplace | FR-AGENCY-004 |
+| AGENCY-005 | Agency Marketplace | FR-AGENCY-005 |
 
 ---
 

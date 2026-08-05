@@ -965,6 +965,38 @@ Two real UX decisions for the idle timeout (duration; warn-then-sign-out vs. sil
 
 **Related Documents:** `database.md` §5.16, `api-design.md` §24, `user-stories.md` Epic 11 (`CONTENT-002`/`003`), `roadmap.md` §13 (Sprint 9 scope), `project-state.md` (2026-08-05 Recent Changes/Technical Debt — the orphaned-migration incident this ADR resolves).
 
+## ADR-035: Agency Marketplace built as a new Sprint 9, ahead of `FUT-002`/`FUT-004`'s original deferred placement
+
+**Status:** Accepted
+**Date:** 2026-08-05
+
+**Decision:** Self-service agency onboarding, public Agency Profile Pages, and a reviews/ratings system (`user-stories.md` Epic 12) are built now, as a new **Sprint 9 — Agency Marketplace**, inserted between Sprint 8 (Quality Assurance, closed) and the original Sprint 9 (Production Launch, renumbered Sprint 10) — rather than after `v1.0.0`, which is where `FUT-002` (agency onboarding) and part of `FUT-004`'s note (public agency profile pages, `ui-guidelines.md` §23) originally placed this work.
+
+**Context:** A single developer request bundled two very different kinds of work: (1) small, in-scope bug fixes/polish to already-built Sprint 6/7 dashboards, and (2) a brand-new product surface with no prior documentation decision behind it — `database.md` only sketched a future `reviews` table (explicitly "deferred"), agencies were documented as admin-created only for MVP, and public agency pages were explicitly tied to `FUT-002`/`FUT-004`. Put to the developer via `AskUserQuestion` rather than silently absorbed or silently refused, with three options: defer group (2) as a properly-scoped future epic; build everything now as a deliberate override; or do only the bug fixes this session. The developer chose to **build everything now**, explicitly accepting that this pushes Production Launch out further.
+
+**Rationale:** Per `CLAUDE.md` §14, a user instruction that knowingly overrides an already-documented decision is honored once the override has been surfaced as such — which it was. Building it as a real, separately-numbered sprint (not folded silently into Sprint 8's already-closed scope or Sprint 9/10's launch-prep scope) keeps the roadmap's own sprint-boundary discipline intact (`roadmap.md` §24, rule 8: scope creep is a roadmap update, not a silent absorption) and gives this substantial a body of work (new schema, RLS, a trust/moderation workflow, a new public page — comparable in size to Sprint 6/7) its own Definition of Done rather than quietly inflating an adjacent sprint's.
+
+**Consequences:** Production Launch is renumbered Sprint 9 → Sprint 10 throughout `roadmap.md` (§3 Sprint Overview, §13/§14 sprint sections, §15 dependency graph, §16 Milestones, §21–§25's cross-references). `user-stories.md` gains Epic 12 (`AGENCY-001`–`005`); `requirements.md` gains an appended §17 (not renumbered into the middle of the existing 16 sections, to avoid breaking every other cross-reference to §11–§16). `FUT-002` and the relevant portion of `FUT-004`'s note in `user-stories.md`/`database.md`/`ui-guidelines.md`/`roadmap.md` are marked superseded/built, not deleted — the historical record of what was originally deferred, and why, stays intact per this document's own append-only philosophy.
+
+**Related Documents:** `user-stories.md` Epic 12, `database.md` §5.3/§5.17, `api-design.md` §25, `roadmap.md` §13/§14, ADR-036 (the trust model chosen for the self-service onboarding piece specifically).
+
+---
+
+## ADR-036: Self-service agency onboarding goes through an application + admin-approval workflow, not a direct client-side `agencies` INSERT
+
+**Status:** Accepted
+**Date:** 2026-08-05
+
+**Decision:** A customer can INSERT their own `agencies` row (a new `agencies_insert_self` RLS policy), but a `BEFORE INSERT` trigger (`enforce_agency_onboarding_status()`) — not the client — forces that row to start `onboarding_status = 'pending_review'` and `is_active = false` regardless of what was submitted. Two admin-only `security definer` RPCs, `approve_agency_application()`/`reject_agency_application()`, are the only path out of `pending_review`; approval atomically promotes the applicant's `profiles.role` to `agent` and creates their `agents` row.
+
+**Context:** Investigating how to let a customer "become an agency" surfaced that this codebase has a deliberately hardened invariant: `handle_new_user()`'s own comment states "role always defaults to 'customer' here — registration never accepts a role from the client," and `prevent_self_role_change()` blocks any non-admin from changing a `role` column, including their own. A genuinely instant, ungated self-service flow (customer INSERTs an agency, is immediately an agent) would either require punching a new hole in that hardened boundary, or silently relying on the client to "behave" — neither acceptable. The alternative considered and rejected: skip the application/approval step entirely and let a customer's agency go live immediately upon submission (true "self-service," no admin gate at all).
+
+**Rationale:** This project already has a proven trust/moderation pattern for exactly this shape of problem — property verification (`AGENT-007`: an agent submits, a moderator/admin decides, a trigger-backed RPC is the sole state-transition path). Reusing that pattern for agency applications (i) preserves the existing "role is never client-controlled" invariant untouched — the role promotion happens inside an admin-invoked, admin-authorized RPC, not a client write, so `prevent_self_role_change()` never even needs to consider this path; (ii) matches this project's own documented lesson that RLS/client input alone isn't reliably sufficient for a trust-relevant decision (`database.md` §9's `properties`/`favorites` OR-combination gap, `prevent_booking_unavailable_property()`) — a trigger is the actual backstop here too; and (iii) means "self-service" describes *submitting an application without waiting on an admin to manually create the record first*, which is the real problem worth solving, not "zero admin involvement ever," which this project's existing trust model doesn't extend to for any other agency-affecting action either (agency `CREATE`/`DELETE` have always been admin-only).
+
+**Consequences:** A newly-approved agent's first-ever login isn't instant relative to their application — there's a real admin review step in between, same as `AGENT-007`'s existing property-verification turnaround. If a future session wants to speed this up (e.g., auto-approval under some criteria), that's a new, explicit decision superseding this one, not a quiet removal of the approval gate. The admin Agencies screen (not a new moderator-facing screen) hosts the approve/reject actions, since Agencies management has never been part of the moderator route group (`decisions.md` ADR-031) — kept consistent rather than opening a new moderator surface for one narrow workflow.
+
+**Related Documents:** `database.md` §5.3 (`agencies_insert_self`, `enforce_agency_onboarding_status()`, `approve_agency_application()`/`reject_agency_application()`), `api-design.md` §25.1/§25.2, `user-stories.md` `AGENCY-001`/`AGENCY-002`, ADR-035.
+
 ---
 
 # Future ADR Process

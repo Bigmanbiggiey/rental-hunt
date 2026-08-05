@@ -13,7 +13,7 @@ This document is the master execution plan for building Rental Hunt KE's MVP. Wh
 
 **How to use this document during development:**
 - Before starting any sprint, re-read that sprint's section here in full — objectives, dependencies, and Definition of Done.
-- Treat sprint boundaries as hard gates (§23): a sprint's Definition of Done must be met before the next sprint's work begins, even under schedule pressure.
+- Treat sprint boundaries as hard gates (§24): a sprint's Definition of Done must be met before the next sprint's work begins, even under schedule pressure.
 - Use `project-state.md` (initialized alongside this document) as the living record of actual progress against this plan — this roadmap is the plan, `project-state.md` is the diary of what actually happened, and the two are expected to diverge slightly over time as reality intrudes.
 - When a decision made here turns out to be wrong once implementation starts, update this document in the same change (§18) rather than silently drifting from it.
 
@@ -45,9 +45,12 @@ This document is the master execution plan for building Rental Hunt KE's MVP. Wh
 | 6 | Agent Dashboard | 10–12 days | Agents can create/edit/archive listings, upload images, manage availability, verify status, manage bookings | Not Started |
 | 7 | Administration | 6–8 days | Moderator verification queue, Admin user/agency management, activity logs, basic analytics | Not Started |
 | 8 | Quality Assurance | 6–8 days | Cross-cutting hardening: accessibility, performance, security, responsive/cross-browser pass | Not Started |
-| 9 | Production Launch | 3–4 days | v1.0.0 deployed to production, monitored, and validated against `requirements.md` §15 success criteria | Not Started |
+| 9 | Agency Marketplace | 10–12 days | Self-service agency onboarding, public Agency Profile Pages, reviews/ratings, admin overview drill-downs | Not Started |
+| 10 | Production Launch | 3–4 days | v1.0.0 deployed to production, monitored, and validated against `requirements.md` §15 success criteria | Not Started |
 
-**Total estimate: ~57–73 working days (~11–15 weeks)**, already including per-sprint buffer — see §24 for the detailed breakdown and critical path.
+**Added 2026-08-05:** Sprint 9 (Agency Marketplace) is a new insertion, ahead of `FUT-002`/`FUT-004`'s original deferred placement — an explicit developer decision (`decisions.md` ADR-035), made while the project sat paused between Sprint 8 (closed) and the old Sprint 9 (Production Launch, not yet started). Production Launch is renumbered to Sprint 10 as a direct consequence; nothing about its own scope changes.
+
+**Total estimate: ~67–85 working days (~13–17 weeks)**, already including per-sprint buffer — see §25 for the detailed breakdown and critical path.
 
 ---
 
@@ -287,15 +290,42 @@ This sprint is deliberately **not** feature work — it's the dedicated hardenin
 
 ---
 
-# 13. Sprint 9 - Production Launch
+# 13. Sprint 9 - Agency Marketplace
+
+**Added 2026-08-05**, inserted ahead of the original Sprint 9 (renumbered Sprint 10 below) — an explicit developer decision to build self-service agency onboarding, public agency profile pages, and reviews/ratings now rather than after `v1.0.0` (`decisions.md` ADR-035), superseding `FUT-002`'s original deferred placement early.
+
+**Stories covered:** `AGENCY-001`–`AGENCY-005` (`user-stories.md` Epic 12).
+
+## Scope
+- Self-Service Agency Registration (`AGENCY-001`): a customer applies from `/register-agency`; the application always starts `pending_review`/inactive regardless of client input (`database.md` §5.3's `enforce_agency_onboarding_status()` trigger).
+- Admin Agency Application Review (`AGENCY-002`): approve/reject actions folded into the existing admin Agencies screen (admin-only, not moderator); approval atomically promotes the applicant to `agent` and creates their `agents` row — closing a real, pre-existing gap (no path in this codebase created an `agents` row before this sprint).
+- Public Agency Profile Page (`AGENCY-003`): `/agencies/:slug` — identity, contact, social links, aggregate rating, properties, agents.
+- Agency & Agent Reviews and Ratings (`AGENCY-004`): a customer reviews a completed viewing once; `reviews` (`database.md` §5.17) and its two rating-summary views.
+- Admin Overview Drill-Downs (`AGENCY-005`): each stat card becomes a browsable, 10-per-page list; two new admin screens (`AdminPropertiesPage`, `AdminBookingsPage`) fill gaps the original Sprint 7 plan deliberately left as out-of-scope placeholders.
+- Two independent, no-schema-change bug fixes bundled in alongside this sprint (found during the same review, not new scope): a role-aware "back to my dashboard" link on the public site's Header for a signed-in non-guest, and a mobile stacking-context fix so the property-detail map can never render on top of an open booking dialog (`ui-guidelines.md` §12.11/§15.1).
+
+## Dependencies
+Requires Sprint 5 (`viewing_requests`/`viewing_status`, since a review's eligibility is gated on a `completed` one), Sprint 3 (`agencies`/`agents` as first-class entities), and Sprint 7 (the existing admin Agencies screen this sprint extends rather than replaces).
+
+## Definition of Done
+- A customer can apply to register an agency, see their own application's pending/approved/rejected status, and — once approved — operate as a real agent (own `agents` row, `agent` role).
+- An admin can approve or reject a pending application, with rejection requiring a reason the applicant can see.
+- A guest can view any active agency's public profile page: identity, rating, properties, and agents (each with their own rating).
+- A customer can leave exactly one review per completed viewing; the review's agency/agent/property association is never client-suppliable.
+- Every Admin Overview stat card links to a real, paginated (10/page) list.
+- The mobile map/booking-dialog overlay and the missing dashboard-back-link are both verified fixed on a real 375px viewport.
+
+---
+
+# 14. Sprint 10 - Production Launch
 
 ## Scope
 - Static & Legal Content (pre-launch prep, `user-stories.md` Epic 11, added 2026-08-05): `CONTENT-001`–`005` — How It Works (merged into the homepage 2026-08-05, no longer a separate About route), Contact form + admin review screen, Terms of Service, Privacy Policy, and a genuine 404 page. Folded into this sprint rather than given its own, since Terms/Privacy is a real launch blocker and the rest is small, low-risk static content. **Terms of Service and Privacy Policy content is blocked on the Product Owner supplying real legal/company text** — engineering does not draft binding legal content; this must be resolved before this sprint's DoD can close.
 - Production Build: final production bundle built and smoke-tested locally before deploy.
-- Deployment Validation: Vercel production environment configured with the production Supabase project's credentials (not the dev/staging project used through Sprints 1–8).
+- Deployment Validation: Vercel production environment configured with the production Supabase project's credentials (not the dev/staging project used through Sprints 1–9).
 - Database Migration: full migration history (`database.md` §13) replayed clean against the production Supabase project; seed data (§12) replaced with real launch-ready reference data (all 47 counties, a complete amenities list, real agency/agent accounts — not dev fixtures).
 - Environment Verification: all environment variables present and correct in the production environment; confirm no dev/staging secret is reachable from production and vice versa.
-- Smoke Testing: the golden path (register → search → view details → book a viewing; agent creates → verifies → confirms a booking) walked through against the live production environment immediately after deploy.
+- Smoke Testing: the golden path (register → search → view details → book a viewing; agent creates → verifies → confirms a booking; **added 2026-08-05:** a customer applies for an agency, an admin approves it, the new agent creates a listing) walked through against the live production environment immediately after deploy.
 - Monitoring: error logging (`coding-standards.md` §22) confirmed to be receiving events in production.
 - Backup Strategy: confirm Supabase Cloud's automated backups/PITR are enabled on the production project (`database.md` §13's rollback backstop).
 - Release Checklist: see below.
@@ -303,14 +333,15 @@ This sprint is deliberately **not** feature work — it's the dedicated hardenin
 
 ## Release Checklist
 - [ ] `CONTENT-001`–`005` (How It Works on the homepage, Contact + admin review, Terms, Privacy, 404 page) are built and Terms/Privacy contain real, Product-Owner-approved legal text — not placeholder copy.
-- [ ] All Sprint 0–8 Definitions of Done remain true on the production build (no regression since Sprint 8 closed).
+- [ ] `AGENCY-001`–`005` (Sprint 9) are fully closed.
+- [ ] All Sprint 0–9 Definitions of Done remain true on the production build (no regression since Sprint 9 closed).
 - [ ] Every item in `requirements.md` §15 ("MVP Success Criteria") is verified true in production, not just staging.
-- [ ] Rollback plan (§20) is understood and has been rehearsed at least once against staging.
+- [ ] Rollback plan (§21) is understood and has been rehearsed at least once against staging.
 - [ ] `v1.0.0` tagged and release notes published referencing the shipped `user-stories.md` scope.
 
 ---
 
-# 14. Feature Dependency Graph
+# 15. Feature Dependency Graph
 
 ```mermaid
 flowchart TD
@@ -324,7 +355,8 @@ flowchart TD
     S5 --> S6[Sprint 6<br/>Agent Dashboard & Booking Mgmt]
     S6 --> S7[Sprint 7<br/>Administration & Verification]
     S7 --> S8[Sprint 8<br/>Quality Assurance]
-    S8 --> S9[Sprint 9<br/>Production Launch]
+    S8 --> S9[Sprint 9<br/>Agency Marketplace]
+    S9 --> S10[Sprint 10<br/>Production Launch]
 ```
 
 ## Why These Dependencies Exist
@@ -337,11 +369,12 @@ flowchart TD
 | Discovery (S3) *and* Booking (S5) before the Agent Dashboard (S6) | The Agent Dashboard's booking queue (`BOOK-001`) has nothing to queue until customers can actually create viewing requests; its property list reuses the same list/search UI patterns proven in S3. |
 | Agent Dashboard (S6) before Administration (S7) | Verification (`AGENT-007`) is a two-sided workflow — there is nothing for a Moderator to review until an Agent can submit a listing. |
 | Everything before Quality Assurance (S8) | A dedicated hardening pass only makes sense once there's a complete surface to harden — running it earlier would mean re-running it after every subsequent sprint anyway. |
-| QA (S8) before Launch (S9) | Per `requirements.md` §15, launch success criteria assume a working, tested product — Sprint 9 is deployment and validation, not a place to discover new bugs. |
+| QA (S8) before Agency Marketplace (S9) | Added 2026-08-05 — this insertion needed a stable, hardened surface to extend (the admin Agencies screen, the booking/review lifecycle) rather than building on top of Sprint 8's own in-flight fixes. |
+| Agency Marketplace (S9) before Launch (S10) | Per `requirements.md` §15, launch success criteria assume a working, tested product — Sprint 10 is deployment and validation, not a place to discover new bugs, and S9's own scope must be real and stable before it ships to production. |
 
 ---
 
-# 15. Milestones
+# 16. Milestones
 
 | Milestone | Marks the end of | Significance |
 |---|---|---|
@@ -353,41 +386,42 @@ flowchart TD
 | **Booking Workflow Complete** | Sprint 5 | The full core hypothesis from `vision.md` §"Minimum Viable Product" — "people are willing to book a physical viewing through this platform" — is testable end-to-end. |
 | **Agent Dashboard Complete** | Sprint 6 | Agents can operate independently of manual database seeding — the platform can be populated by real users. |
 | **Admin Dashboard Complete** | Sprint 7 | The full `Discover → Evaluate → Book Viewing → Visit Property` loop (`requirements.md` §1) is operable by all five roles. |
-| **Production Ready** | Sprint 8 | Every quality bar in §19/§21 is met; nothing left to build, only to validate. |
-| **Launch (v1.0.0)** | Sprint 9 | Rental Hunt KE is live in production. |
+| **Production Ready** | Sprint 8 | Every quality bar in §20/§22 is met; nothing left to build, only to validate. |
+| **Agency Marketplace Complete** | Sprint 9 | Agencies can onboard themselves, and the platform has a public trust signal (reviews/ratings) — added 2026-08-05. |
+| **Launch (v1.0.0)** | Sprint 10 | Rental Hunt KE is live in production. |
 
 ---
 
-# 16. Risk Register
+# 17. Risk Register
 
 | Risk | Likelihood | Impact | Mitigation | Owner |
 |---|---|---|---|---|
-| Supabase free/starter-tier limits (storage, bandwidth, connection count) hit during development or shortly after launch | Medium | Medium | Monitor usage from Sprint 3 onward (first sprint with real image uploads at scale); budget for a paid tier before Sprint 9 if projected usage requires it. | Developer |
+| Supabase free/starter-tier limits (storage, bandwidth, connection count) hit during development or shortly after launch | Medium | Medium | Monitor usage from Sprint 3 onward (first sprint with real image uploads at scale); budget for a paid tier before Sprint 10 (launch) if projected usage requires it. | Developer |
 | Image upload reliability/cost as listing volume grows | Medium | Medium | The `process-property-image` Edge Function (`api-design.md` §12) and size/type limits (`database.md` §10) are scoped in from Sprint 6, not retrofitted. | Developer |
 | RLS policy complexity causing subtle authorization bugs (e.g. an agent seeing another agency's data) | Medium | High | Every RLS-sensitive Repository has an integration test against a real local Supabase instance (`coding-standards.md` §19), and Sprint 8 includes explicit adversarial manual testing (§12). | Developer |
 | Search performance degrading as listing volume grows past dev-scale fixtures | Low (MVP scale) | Medium | Indexing strategy (`database.md` §8) is implemented from Sprint 3, not added reactively; the GIN/composite indexes are already load-tested against the NFR-SEARCH-001 2-second target during that sprint's DoD. | Developer |
-| Scope creep — features drifting beyond the approved MVP (e.g. building toward `FUT` items early) | Medium | High | Every sprint's scope is pinned to specific `user-stories.md` IDs in this document; §23's execution rules explicitly forbid implementing outside the active sprint. | Developer |
-| Deployment/environment misconfiguration (dev credentials leaking into production, or vice versa) | Low | High | Sprint 9's Environment Verification step is a named, checked task, not an assumption; `coding-standards.md` §21 bans any service-role/secret key from ever being `VITE_`-prefixed. | Developer |
-| Solo-developer bus factor / burnout across a ~3-month build | Medium | High | Sprint boundaries (§23) enforce sustainable, checkable increments rather than one undifferentiated push; documentation-driven development (§2) means work can pause and resume without losing context. |
+| Scope creep — features drifting beyond the approved MVP (e.g. building toward `FUT` items early) | Medium | High | Every sprint's scope is pinned to specific `user-stories.md` IDs in this document; §24's execution rules explicitly forbid implementing outside the active sprint (Sprint 9's own insertion is the one deliberate, disclosed exception — see its own section, not a silent violation of this rule). | Developer |
+| Deployment/environment misconfiguration (dev credentials leaking into production, or vice versa) | Low | High | Sprint 10's Environment Verification step is a named, checked task, not an assumption; `coding-standards.md` §21 bans any service-role/secret key from ever being `VITE_`-prefixed. | Developer |
+| Solo-developer bus factor / burnout across a ~3-month build | Medium | High | Sprint boundaries (§24) enforce sustainable, checkable increments rather than one undifferentiated push; documentation-driven development (§2) means work can pause and resume without losing context. |
 | AI-assisted code drifting from `coding-standards.md` over many sessions | Medium | Medium | `coding-standards.md` §25's AI Collaboration Standards are binding, not advisory; the Code Review Checklist (§26 there) is applied to every PR regardless of who/what wrote it. | Developer |
 | Third-party dependency churn (Tailwind v4, React 19, shadcn/ui are all comparatively new/fast-moving) | Low | Medium | Dependency versions are pinned; upgrades are a deliberate, tested decision, never an incidental side effect of an unrelated change. | Developer |
 | Real-world Kenyan mobile network conditions (patchy 4G) exposing performance issues dev testing on fast wifi wouldn't catch | Medium | Medium | Performance targets are tested under simulated throttled-4G conditions from Sprint 3 onward (§7), not only measured on a fast development connection. | Developer |
 
 ---
 
-# 17. Technical Debt Strategy
+# 18. Technical Debt Strategy
 
 | Aspect | Policy |
 |---|---|
 | **Acceptable debt** | A deliberately deferred, documented scope reduction with a named future owner — e.g. deferring dashboard-table virtualization (`coding-standards.md` §20) until a real list exceeds ~100 rows, or shipping Supabase's default email templates instead of custom-branded ones for password reset. Acceptable debt is written down at the moment it's incurred, with a `// TODO` referencing the deferred story/decision (`coding-standards.md` §24). |
 | **Unacceptable debt** | Skipping RLS on a new table "temporarily"; skipping input validation on a write path; skipping tests on a Service or Repository; hardcoding a color instead of using a semantic token; disabling TypeScript strict mode to unblock a build; merging a PR with a failing CI pipeline. None of these are ever an acceptable shortcut under schedule pressure — they are exactly the shortcuts this project's standards exist to prevent (`coding-standards.md` §1). |
 | **Refactoring policy** | A refactor is proposed and its tradeoffs explained *before* it's executed (`coding-standards.md` §25, rule 8) — never discovered by the developer after the fact in an unexpectedly large diff. Refactors are scoped to a single PR and never bundled silently inside an unrelated feature PR. |
-| **Debt register** | Tracked as a running section within `project-state.md` (§23) — a simple dated log of `(what was deferred, why, which sprint/story will address it)`. Not a separate `TECH_DEBT.md` file; one living-state document is simpler to keep current than two. |
+| **Debt register** | Tracked as a running section within `project-state.md` (§24) — a simple dated log of `(what was deferred, why, which sprint/story will address it)`. Not a separate `TECH_DEBT.md` file; one living-state document is simpler to keep current than two. |
 | **Review frequency** | The debt register is reviewed at the start of every sprint (is anything in it now in scope for this sprint?) and explicitly re-reviewed in full during Sprint 8 (is anything left unresolved that blocks a production-ready launch?). |
 
 ---
 
-# 18. Documentation Maintenance
+# 19. Documentation Maintenance
 
 | Change Type | Documents That Must Update | In the Same Change As |
 |---|---|---|
@@ -402,7 +436,7 @@ The underlying rule, restated from `coding-standards.md` §24: a structural chan
 
 ---
 
-# 19. Definition of Done
+# 20. Definition of Done
 
 This mirrors `coding-standards.md` §27 exactly — restated here as the roadmap's per-feature gate so sprint planning and code review share one definition, not two slightly different ones.
 
@@ -417,46 +451,45 @@ A feature is done only when:
 - ✓ **Linted** — zero ESLint errors.
 - ✓ **Passes type checking** — `tsc --noEmit` clean.
 - ✓ **Reviewed** — a PR opened and self-reviewed against `coding-standards.md` §26 before merge.
-- ✓ **Production ready** — no known Critical/High severity bug, no TODO without an explanation (§17).
+- ✓ **Production ready** — no known Critical/High severity bug, no TODO without an explanation (§18).
 
 ---
 
-# 20. Release Strategy
+# 21. Release Strategy
 
 | Aspect | Policy |
 |---|---|
-| **Versioning** | Semantic versioning (`coding-standards.md` §23): `v0.x.y` throughout Sprints 1–8, `v1.0.0` at Sprint 9's production launch, `MAJOR` bumps reserved for breaking schema/API changes post-launch. |
-| **Release cadence** | Every merged PR deploys automatically to a Vercel preview against the development Supabase project (continuous deployment to non-production). Promotion to the production environment is a deliberate, manual gate — first exercised at Sprint 9, and thereafter for any subsequent release. |
-| **Hotfixes** | Branch from `main`, fix, fast-tracked through the same Definition of Done (§19) and Code Review Checklist (`coding-standards.md` §26) — never skipped for urgency — then a `PATCH` version bump and immediate deploy. |
+| **Versioning** | Semantic versioning (`coding-standards.md` §23): `v0.x.y` throughout Sprints 1–9, `v1.0.0` at Sprint 10's production launch, `MAJOR` bumps reserved for breaking schema/API changes post-launch. |
+| **Release cadence** | Every merged PR deploys automatically to a Vercel preview against the development Supabase project (continuous deployment to non-production). Promotion to the production environment is a deliberate, manual gate — first exercised at Sprint 10, and thereafter for any subsequent release. |
+| **Hotfixes** | Branch from `main`, fix, fast-tracked through the same Definition of Done (§20) and Code Review Checklist (`coding-standards.md` §26) — never skipped for urgency — then a `PATCH` version bump and immediate deploy. |
 | **Rollback process** | Application: Vercel's instant rollback to the previous deployment. Database: migrations are forward-only (`database.md` §13) — a bad migration is corrected by a new migration, with Supabase Cloud's Point-in-Time Recovery as the backstop for anything a forward-fix can't address in time. |
 | **Database migrations** | Applied via the Supabase CLI through CI/CD (`database.md` §13) — never manually against a shared environment. |
-| **Environment promotion** | Local (developer machine, `supabase start`) → Development/Staging (shared Supabase project, used Sprints 1–8) → Production (separate Supabase project, first used at Sprint 9) — matching the environment tiers `architecture.md` §19 already anticipates. |
+| **Environment promotion** | Local (developer machine, `supabase start`) → Development/Staging (shared Supabase project, used Sprints 1–9) → Production (separate Supabase project, first used at Sprint 10) — matching the environment tiers `architecture.md` §19 already anticipates. |
 
 ---
 
-# 21. Success Metrics
+# 22. Success Metrics
 
 | Metric | Target | Measured |
 |---|---|---|
 | Build success rate | 100% on `main` | CI pipeline status |
 | TypeScript errors | Zero, always | `tsc --noEmit` gate on every PR |
-| Lighthouse Performance | ≥ 90 on primary screens (home, search, detail, dashboards) by launch | Sprint 8, re-checked at Sprint 9 |
+| Lighthouse Performance | ≥ 90 on primary screens (home, search, detail, dashboards) by launch | Sprint 8, re-checked at Sprint 10 |
 | Lighthouse Accessibility | ≥ 95 | Sprint 8 |
 | Accessibility (axe) | Zero critical/serious violations | Sprint 8 |
 | Performance budget | Initial load < 3s on simulated 4G; LCP < 2.5s (`requirements.md` §13.1) | Every sprint from Sprint 3 onward |
-| Bug count | Zero Critical/High open at each sprint close; trending toward zero of any severity by Sprint 9 | Tracked per sprint |
+| Bug count | Zero Critical/High open at each sprint close; trending toward zero of any severity by Sprint 10 | Tracked per sprint |
 | Deployment frequency | At least one deploy per completed sprint (continuous preview deployment makes this closer to "every merged PR") | CI/CD logs |
-| Feature completion | 100% of MVP `user-stories.md` scope (Epics 1–9) before `v1.0.0`; 0% of Epic 10 (Future) — matching the MVP Scope Summary in `user-stories.md` | Sprint 9 gate |
+| Feature completion | 100% of MVP `user-stories.md` scope (Epics 1–9, plus Epic 12 added 2026-08-05) before `v1.0.0`; 0% of Epic 10 (Future, minus the Epic 12 pieces already superseded) — matching the MVP Scope Summary in `user-stories.md` | Sprint 10 gate |
 
 ---
 
-# 22. Future Roadmap
+# 23. Future Roadmap
 
-Everything below is **Epic 10** in `user-stories.md` (`FUT-001`–`FUT-006`) and the Future Expansion sections of `database.md` §15 / `api-design.md` §22 / `ui-guidelines.md` §23 — explicitly out of scope for the sprints above, listed here only to show the MVP was built without foreclosing them:
+Everything below is **Epic 10** in `user-stories.md` (`FUT-001`, `FUT-003`, `FUT-005`, `FUT-006` — `FUT-002`/`FUT-004`'s onboarding/multi-agency-page pieces were superseded early by Epic 12, 2026-08-05, see below) and the Future Expansion sections of `database.md` §15 / `api-design.md` §22 / `ui-guidelines.md` §23 — explicitly out of scope for the sprints above, listed here only to show the MVP was built without foreclosing them:
 
 | Initiative | Story Reference | Foundation already in place |
 |---|---|---|
-| Agency self-service onboarding | `FUT-002` | `agencies`/`agents` already modeled as first-class entities (`database.md` §5.3/§5.4) — onboarding is additive UI, not a schema change. |
 | Premium listings | `FUT-003` | `properties.is_featured` already exists; a `subscriptions` table gates it (`database.md` §15). |
 | M-Pesa integration | `FUT-001` | A `payments` table sketch plus a `daraja-webhook` Edge Function following the already-established webhook pattern (`api-design.md` §12/§22). |
 | AI recommendations | `FUT-005` | `favorites`, `viewing_requests`, and `activity_logs` already capture the behavioral data a recommender would consume. |
@@ -464,24 +497,27 @@ Everything below is **Epic 10** in `user-stories.md` (`FUT-001`–`FUT-006`) and
 | Public API | — | An Edge Function gateway (`/api/v1/...`) fronting the existing Repositories (`api-design.md` §20/§22). |
 | Analytics platform | — | Builds on Sprint 6/7's basic analytics (`AGENT-008`, admin analytics) rather than replacing them. |
 | Localization (Swahili, others) | — | Copy is already centralized per `ui-guidelines.md` §20, not scattered inline — extraction to an i18n layer is additive. |
+| Multi-agency SaaS support (an agent working across *multiple* agencies at once) | `FUT-004` | Still genuinely deferred — see `database.md` §15's "Multi-Agency Support" note. Not to be confused with Sprint 9's Agency Marketplace, which solves a different problem (self-service creation of a single agency) and is already built. |
+
+**Superseded early, 2026-08-05 (no longer future work — see Sprint 9 above):** `FUT-002` (agency self-service onboarding) and the "public agency profile pages" portion of `FUT-004`'s original note in `ui-guidelines.md` §23.
 
 ---
 
-# 23. Claude Code Execution Guide
+# 24. Claude Code Execution Guide
 
-1. **Always complete one sprint before starting another.** Sprint N+1 work does not begin until Sprint N's Definition of Done (§19) is met — even if a later sprint's task looks quick or tempting to knock out early.
-2. **Never implement features outside the active sprint's scope.** If a task would require touching a story ID not listed in the current sprint's section (§4–§13), stop and flag it rather than absorbing it silently.
+1. **Always complete one sprint before starting another.** Sprint N+1 work does not begin until Sprint N's Definition of Done (§20) is met — even if a later sprint's task looks quick or tempting to knock out early.
+2. **Never implement features outside the active sprint's scope.** If a task would require touching a story ID not listed in the current sprint's section (§4–§14), stop and flag it rather than absorbing it silently.
 3. **Update `project-state.md` after every completed task.** Its structure: a dated log entry per completed task (`user-stories.md` ID, sprint, one-line summary), the current active sprint, and any open blockers — a running diary of actual progress against this plan, not a copy of the plan itself.
-4. **Update documentation when implementation changes**, in the same PR, per §18 — never as a deferred follow-up.
-5. **Run linting and type-checking before marking any task complete** (§19) — a task is not done if `npm run lint`/`tsc --noEmit` fail, regardless of whether the feature "works."
+4. **Update documentation when implementation changes**, in the same PR, per §19 — never as a deferred follow-up.
+5. **Run linting and type-checking before marking any task complete** (§20) — a task is not done if `npm run lint`/`tsc --noEmit` fail, regardless of whether the feature "works."
 6. **Explain architectural trade-offs before large refactors**, per `coding-standards.md` §25 — this applies with particular force to Sprint 6 and Sprint 7, the two sprints most likely to reveal that an earlier sprint's shortcut needs revisiting.
 7. **Reference `user-stories.md` IDs in commits and PR descriptions** for traceability from roadmap → story → code → test.
-8. **Flag scope creep immediately.** If a sprint's actual work is expanding past what's scoped here, that's a roadmap update (§18), not a silent absorption into "while I'm in here."
-9. **Stop and ask when a sprint's scope conflicts with a downstream sprint's stated dependency** (§14) — e.g. if Sprint 5 work seems to require something not actually delivered until Sprint 6, that's a sign either this roadmap's ordering or the current understanding of a dependency is wrong, and it should be resolved explicitly, not worked around.
+8. **Flag scope creep immediately.** If a sprint's actual work is expanding past what's scoped here, that's a roadmap update (§19), not a silent absorption into "while I'm in here." (Sprint 9's own insertion went through this exact process — proposed, surfaced to the developer, and only then written down here — rather than being silently absorbed into Sprint 8 or Sprint 10.)
+9. **Stop and ask when a sprint's scope conflicts with a downstream sprint's stated dependency** (§15) — e.g. if Sprint 5 work seems to require something not actually delivered until Sprint 6, that's a sign either this roadmap's ordering or the current understanding of a dependency is wrong, and it should be resolved explicitly, not worked around.
 
 ---
 
-# 24. Engineering Timeline
+# 25. Engineering Timeline
 
 | Sprint | Estimated Effort | Complexity | Key Dependencies | Critical Path? | Buffer Included |
 |---|---|---|---|---|---|
@@ -494,14 +530,16 @@ Everything below is **Epic 10** in `user-stories.md` (`FUT-001`–`FUT-006`) and
 | 6 | 10–12 days | **Highest** — largest single sprint, two epics, image upload pipeline, first full CRUD surface | Sprints 3, 5 | Yes | ~2–3 days |
 | 7 | 6–8 days | Medium–High (verification workflow correctness, admin role scope) | Sprint 6 | Yes | ~1–2 days |
 | 8 | 6–8 days | Medium (breadth, not depth — many small fixes across every prior sprint) | Sprints 0–7 | Yes | ~2 days |
-| 9 | 3–4 days | Medium (deployment risk is operational, not coding) | Sprint 8 | Yes | ~1 day |
+| 9 | 10–12 days | High (added 2026-08-05 — new schema, a trust/moderation workflow, and a public-facing page, sized like Sprint 6/7) | Sprint 8 | Yes | ~2 days |
+| 10 | 3–4 days | Medium (deployment risk is operational, not coding) | Sprint 9 | Yes | ~1 day |
 
 Every sprint sits on the critical path — this roadmap has no parallel workstreams, consistent with a solo-developer execution model. There is no slack to absorb a delayed sprint except the per-sprint buffer already built into the ranges above.
 
 **Highest-risk sprints:**
 - **Sprint 6 (Agent Dashboard)** — the largest scope in the roadmap (14 stories across two epics) and the first sprint exercising the full image-upload pipeline and a real multi-agency RLS boundary under load. Budget the full 10–12 day range; do not compress it to make up time lost elsewhere.
 - **Sprint 2 (Authentication)** — small in story count but foundational; an RLS mistake made here propagates into every later sprint's authorization assumptions, so its buffer exists for correctness verification, not just feature-building speed.
-- **Sprint 9 (Launch)** — short in duration but highest-consequence; the "buffer" here is really the rehearsed-rollback requirement in §13's Release Checklist, not extra coding time.
+- **Sprint 9 (Agency Marketplace)** — added 2026-08-05; comparable risk profile to Sprint 6/7 (new schema, a self-service trust/moderation workflow, a new public page) inserted after the project was otherwise QA-complete and paused before launch. Budget the full range; do not compress it to protect Sprint 10's own short timeline.
+- **Sprint 10 (Launch)** — short in duration but highest-consequence; the "buffer" here is really the rehearsed-rollback requirement in §14's Release Checklist, not extra coding time.
 
 ```mermaid
 gantt
@@ -521,9 +559,10 @@ gantt
     section Platform & Launch
     Sprint 7 - Administration            :s7, after s6, 8d
     Sprint 8 - Quality Assurance         :crit, s8, after s7, 8d
-    Sprint 9 - Production Launch         :milestone, s9, after s8, 4d
+    Sprint 9 - Agency Marketplace        :crit, s9, after s8, 12d
+    Sprint 10 - Production Launch        :milestone, s10, after s9, 4d
 ```
 
 ---
 
-This document is the single source of truth for how Rental Hunt KE's MVP gets built, in what order, and by what gates. It should be updated whenever a sprint's actual outcome diverges from this plan (recorded in `project-state.md` as it happens, reconciled back into this document at each milestone, §15), and kept consistent with all eight documents it's built on as the project evolves.
+This document is the single source of truth for how Rental Hunt KE's MVP gets built, in what order, and by what gates. It should be updated whenever a sprint's actual outcome diverges from this plan (recorded in `project-state.md` as it happens, reconciled back into this document at each milestone, §16), and kept consistent with all eight documents it's built on as the project evolves.
