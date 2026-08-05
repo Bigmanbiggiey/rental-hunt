@@ -33,6 +33,13 @@ interface DashboardShellProps {
   /** `aria-label` for the nav landmark, e.g. "Admin dashboard". */
   navLabel: string;
   navLinks: DashboardNavLink[];
+  /**
+   * Optional line under the brand link — added 2026-08-05 for the agent
+   * dashboard's own agency name (no other role has an equivalent concept),
+   * so this stays a plain optional prop the other three roles simply don't
+   * pass, rather than a role-specific branch inside this shared shell.
+   */
+  subtitle?: string;
   children: ReactNode;
 }
 
@@ -165,7 +172,7 @@ function UserMenu() {
  * previously every dashboard route rendered both this shell's own header
  * *and* `AppLayout`'s public one at the same time.
  */
-export function DashboardShell({ brandHref, navLabel, navLinks, children }: DashboardShellProps) {
+export function DashboardShell({ brandHref, navLabel, navLinks, subtitle, children }: DashboardShellProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const location = useLocation();
 
@@ -194,12 +201,15 @@ export function DashboardShell({ brandHref, navLabel, navLinks, children }: Dash
                 </div>
               </SheetContent>
             </Sheet>
-            <Link
-              to={brandHref}
-              className="text-h4 text-foreground focus-visible:ring-ring rounded-md font-semibold focus-visible:ring-2 focus-visible:outline-none"
-            >
-              Rental Hunt KE
-            </Link>
+            <div className="flex flex-col leading-tight">
+              <Link
+                to={brandHref}
+                className="text-h4 text-foreground focus-visible:ring-ring rounded-md font-semibold focus-visible:ring-2 focus-visible:outline-none"
+              >
+                Rental Hunt KE
+              </Link>
+              {subtitle && <span className="text-body-sm text-muted-foreground">{subtitle}</span>}
+            </div>
           </div>
 
           <UserMenu />

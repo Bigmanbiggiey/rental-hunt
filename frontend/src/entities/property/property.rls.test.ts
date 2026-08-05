@@ -101,8 +101,11 @@ describe('properties/property_images/property_amenities/agent_directory RLS (int
   it('agent_directory exposes only the documented public-safe fields, never phone/email/role', async () => {
     const { data, error } = await guest.from('agent_directory').select('*').limit(1).single();
     expect(error).toBeNull();
+    // agency_name added 2026-08-05 — still public-safe: agencies are already
+    // guest-`SELECT`-able for active rows (this view's own migration), so
+    // surfacing the name here is not new exposure, just a new column.
     expect(Object.keys(data ?? {}).sort()).toEqual(
-      ['agent_id', 'agency_id', 'full_name', 'avatar_url', 'job_title', 'bio'].sort(),
+      ['agent_id', 'agency_id', 'full_name', 'avatar_url', 'job_title', 'bio', 'agency_name'].sort(),
     );
   });
 

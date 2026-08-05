@@ -9,7 +9,11 @@ export interface AgentRepository {
   getCurrentAgent(profileId: UUID): Promise<Agent>;
 }
 
-const AGENT_COLUMNS = 'id, profile_id, agency_id, job_title, bio, is_active, profile:profiles(full_name, avatar_url)';
+// `agency:agencies(name)` added 2026-08-05 — the agent dashboard never
+// showed which agency the signed-in agent belongs to (a separate gap from
+// AgentCard's public-facing one, fixed via `agent_directory`'s own join).
+const AGENT_COLUMNS =
+  'id, profile_id, agency_id, job_title, bio, is_active, profile:profiles(full_name, avatar_url), agency:agencies(name)';
 
 export const agentRepository: AgentRepository = {
   async getCurrentAgent(profileId) {

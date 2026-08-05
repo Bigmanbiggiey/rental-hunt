@@ -31,6 +31,8 @@ export interface PropertyAgent {
   jobTitle: string | null;
   bio: string | null;
   agencyId: UUID;
+  /** Added 2026-08-05 — `agent_directory` now joins `agencies` for this. */
+  agencyName: string;
 }
 
 /** api-design.md §3.1. */

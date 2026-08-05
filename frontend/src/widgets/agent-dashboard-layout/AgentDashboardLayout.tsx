@@ -1,5 +1,6 @@
 import { Outlet } from 'react-router';
 import { DashboardShell } from '@/widgets/dashboard-shell';
+import { useCurrentAgent } from '@/entities/agent';
 import { PATHS } from '@/shared/config';
 
 const NAV_LINKS = [
@@ -18,8 +19,19 @@ const NAV_LINKS = [
  * the overview, is now reached the same way, via `<Outlet/>`.
  */
 export function AgentDashboardLayout() {
+  // useCurrentAgent() is already the established "my own agency" hook,
+  // reused elsewhere in this feature set — added here 2026-08-05 so the
+  // agent's own agency name shows on every screen in this dashboard, not
+  // just one page.
+  const { data: agent } = useCurrentAgent();
+
   return (
-    <DashboardShell brandHref={PATHS.agentDashboard.root} navLabel="Agent dashboard" navLinks={NAV_LINKS}>
+    <DashboardShell
+      brandHref={PATHS.agentDashboard.root}
+      navLabel="Agent dashboard"
+      navLinks={NAV_LINKS}
+      subtitle={agent?.agencyName}
+    >
       <Outlet />
     </DashboardShell>
   );

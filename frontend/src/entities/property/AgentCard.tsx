@@ -3,10 +3,10 @@ import type { PropertyAgent } from './property.types';
 
 // PROP-005 (ui-guidelines.md §12.7). Pulls only the public-safe
 // `agent_directory` subset already embedded on `Property.agent` — never
-// phone/email directly rendered. Agency name/logo aren't part of PROP-005's
-// actual acceptance criteria (only "agent name and contact/profile info");
-// not fetched here to avoid scope creep — a future ticket can extend
-// `PROPERTY_COLUMNS`'s agent embed if agency branding is explicitly needed.
+// phone/email directly rendered. Agency name added 2026-08-05 — `PROP-005`'s
+// original acceptance criteria didn't call for it, but the developer asked
+// for it directly; `agent_directory` now joins `agencies` for exactly this
+// (see the migration for why that's not a new data-exposure concern).
 export function AgentCard({ agent }: { agent: PropertyAgent }) {
   const hasName = agent.fullName.length > 0;
 
@@ -18,6 +18,7 @@ export function AgentCard({ agent }: { agent: PropertyAgent }) {
       </Avatar>
       <div className="flex flex-col gap-0.5">
         <p className="font-semibold text-foreground">{hasName ? agent.fullName : 'Agent information unavailable'}</p>
+        {agent.agencyName && <p className="text-body-sm text-primary font-medium">{agent.agencyName}</p>}
         {agent.jobTitle && <p className="text-body-sm text-muted-foreground">{agent.jobTitle}</p>}
         {agent.bio && <p className="text-body-sm text-muted-foreground">{agent.bio}</p>}
       </div>

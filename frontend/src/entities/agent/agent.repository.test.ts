@@ -19,6 +19,7 @@ const ROW = {
   bio: 'Ten years in Nairobi rentals.',
   is_active: true,
   profile: { full_name: 'James Mwangi', avatar_url: null },
+  agency: { name: 'Nairobi Homes' },
 };
 
 describe('agentRepository (unit, fake Supabase client)', () => {
@@ -38,6 +39,7 @@ describe('agentRepository (unit, fake Supabase client)', () => {
       jobTitle: 'Leasing Agent',
       bio: 'Ten years in Nairobi rentals.',
       isActive: true,
+      agencyName: 'Nairobi Homes',
     });
   });
 

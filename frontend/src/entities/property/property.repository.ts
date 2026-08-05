@@ -71,7 +71,7 @@ export const PROPERTY_COLUMNS = `
   location:locations(name),
   images:property_images(id, image_url, alt_text, display_order),
   amenities:property_amenities(amenity:amenities(id, name, icon)),
-  agent:agent_directory(agent_id, agency_id, full_name, avatar_url, job_title, bio)
+  agent:agent_directory(agent_id, agency_id, full_name, avatar_url, job_title, bio, agency_name)
 `;
 
 const DEFAULT_LIMIT = 20;

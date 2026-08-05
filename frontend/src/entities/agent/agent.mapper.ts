@@ -9,6 +9,7 @@ export interface AgentRow {
   bio: string | null;
   is_active: boolean;
   profile: { full_name: string; avatar_url: string | null } | null;
+  agency: { name: string } | null;
 }
 
 export function mapAgentRow(row: AgentRow): Agent {
@@ -21,5 +22,6 @@ export function mapAgentRow(row: AgentRow): Agent {
     jobTitle: row.job_title,
     bio: row.bio,
     isActive: row.is_active,
+    agencyName: row.agency?.name ?? '',
   };
 }

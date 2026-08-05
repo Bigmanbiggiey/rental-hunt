@@ -42,6 +42,7 @@ const BASE_ROW: PropertyRow = {
     avatar_url: null,
     job_title: 'Leasing Agent',
     bio: 'Bio',
+    agency_name: 'Nairobi Homes',
   },
 };
 
@@ -81,6 +82,7 @@ describe('mapPropertyRow (unit)', () => {
       jobTitle: 'Leasing Agent',
       bio: 'Bio',
       agencyId: 'ag1',
+      agencyName: 'Nairobi Homes',
     });
   });
 

@@ -62,6 +62,7 @@ export interface AgentDirectoryRow {
   avatar_url: string | null;
   job_title: string | null;
   bio: string | null;
+  agency_name: string;
 }
 
 export interface CountyRow {
@@ -102,6 +103,7 @@ function mapAgentRow(row: AgentDirectoryRow): PropertyAgent {
     jobTitle: row.job_title,
     bio: row.bio,
     agencyId: row.agency_id,
+    agencyName: row.agency_name,
   };
 }
 
@@ -143,7 +145,15 @@ export function mapPropertyRow(row: PropertyRow): Property {
     amenities: row.amenities.map((a) => mapAmenityRow(a.amenity)),
     agent: row.agent
       ? mapAgentRow(row.agent)
-      : { id: row.agent_id, fullName: '', avatarUrl: null, jobTitle: null, bio: null, agencyId: row.agency_id },
+      : {
+          id: row.agent_id,
+          fullName: '',
+          avatarUrl: null,
+          jobTitle: null,
+          bio: null,
+          agencyId: row.agency_id,
+          agencyName: '',
+        },
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
