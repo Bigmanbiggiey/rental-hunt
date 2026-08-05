@@ -16,6 +16,9 @@ export const PATHS = {
     // CONTENT-002 (user-stories.md Epic 11, added 2026-08-05). CONTENT-001
     // (About) has no route of its own — merged into home, 2026-08-05.
     contact: '/contact',
+    // Epic 12 — the public Agency Profile Page (properties/agents/reviews
+    // under one agency), mirroring `propertyDetail`'s exact shape.
+    agencyDetail: '/agencies/:slug',
   },
   // Every authenticated role has its own independent dashboard route group
   // (post-Sprint-8 restructuring, 2026-08-04 — see decisions.md for the ADR
@@ -23,6 +26,10 @@ export const PATHS = {
   // authenticated route that stays outside all four — it's role-agnostic.
   authenticated: {
     profile: '/profile',
+    // Epic 12 — a signed-in customer applying to self-register an agency;
+    // its own narrow `allowedRoles={['customer']}` group, not folded into
+    // the generic authenticated group above (which allows every role).
+    agencyRegister: '/register-agency',
   },
   adminDashboard: {
     root: '/admin-dashboard',
@@ -34,6 +41,13 @@ export const PATHS = {
     activityLogs: '/admin-dashboard/activity-logs',
     // CONTENT-003, added 2026-08-05.
     messages: '/admin-dashboard/messages',
+    // Epic 12 — the Overview's stat cards become clickable drill-downs;
+    // these two were never actually wired into the post-Sprint-8 dashboard
+    // restructuring (the Sprint 7-era "PlaceholderPage" mentions predate it
+    // and were dropped, not carried forward), so they're new here, not
+    // un-hidden.
+    properties: '/admin-dashboard/properties',
+    bookings: '/admin-dashboard/bookings',
   },
   // Moderator's own route group, not a role-filtered view inside admin's —
   // reuses the same admin-verification/admin-activity-log feature hooks and

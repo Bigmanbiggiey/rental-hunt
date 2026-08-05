@@ -41,6 +41,12 @@ const NotFoundPage = lazy(() => import('@/pages/NotFoundPage').then((m) => ({ de
 const ProfilePage = lazy(() =>
   import('@/pages/ProfilePage').then((m) => ({ default: m.ProfilePage })),
 );
+const AgencyRegisterPage = lazy(() =>
+  import('@/pages/AgencyRegisterPage').then((m) => ({ default: m.AgencyRegisterPage })),
+);
+const AgencyDetailPage = lazy(() =>
+  import('@/pages/AgencyDetailPage').then((m) => ({ default: m.AgencyDetailPage })),
+);
 const UserDashboardOverviewPage = lazy(() =>
   import('@/pages/UserDashboardOverviewPage').then((m) => ({ default: m.UserDashboardOverviewPage })),
 );
@@ -67,6 +73,12 @@ const AgentAnalyticsPage = lazy(() =>
 );
 const AdminOverviewPage = lazy(() =>
   import('@/pages/AdminOverviewPage').then((m) => ({ default: m.AdminOverviewPage })),
+);
+const AdminPropertiesPage = lazy(() =>
+  import('@/pages/AdminPropertiesPage').then((m) => ({ default: m.AdminPropertiesPage })),
+);
+const AdminBookingsPage = lazy(() =>
+  import('@/pages/AdminBookingsPage').then((m) => ({ default: m.AdminBookingsPage })),
 );
 const AdminVerificationQueuePage = lazy(() =>
   import('@/pages/AdminVerificationQueuePage').then((m) => ({ default: m.AdminVerificationQueuePage })),
@@ -136,11 +148,21 @@ export const routeConfig: RouteObject[] = [
       { path: PATHS.public.forgotPassword, element: <ForgotPasswordPage /> },
       { path: PATHS.public.resetPassword, element: <ResetPasswordPage /> },
       { path: PATHS.public.contact, element: <ContactPage /> },
+      // Epic 12's public Agency Profile Page — a guest-reachable dynamic
+      // route, same shape as propertyDetail above.
+      { path: PATHS.public.agencyDetail, element: <AgencyDetailPage /> },
       {
         // Any authenticated role — Profile is the one authenticated route
         // that isn't part of any specific role's dashboard.
         element: <ProtectedRoute />,
         children: [{ path: PATHS.authenticated.profile, element: <ProfilePage /> }],
+      },
+      {
+        // Epic 12 — only a customer may apply to self-register an agency
+        // (an agent/admin/moderator already has a role; re-applying isn't a
+        // supported flow for them).
+        element: <ProtectedRoute allowedRoles={['customer']} />,
+        children: [{ path: PATHS.authenticated.agencyRegister, element: <AgencyRegisterPage /> }],
       },
       { path: '*', element: <NotFoundPage /> },
     ],
@@ -164,6 +186,8 @@ export const routeConfig: RouteObject[] = [
         ),
         children: [
           { path: PATHS.adminDashboard.root, element: <AdminOverviewPage /> },
+          { path: PATHS.adminDashboard.properties, element: <AdminPropertiesPage /> },
+          { path: PATHS.adminDashboard.bookings, element: <AdminBookingsPage /> },
           { path: PATHS.adminDashboard.verificationQueue, element: <AdminVerificationQueuePage /> },
           { path: PATHS.adminDashboard.verificationReview, element: <AdminVerificationReviewPage /> },
           { path: PATHS.adminDashboard.users, element: <AdminUsersPage /> },
