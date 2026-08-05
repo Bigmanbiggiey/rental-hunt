@@ -1,10 +1,5 @@
 import { lazy, Suspense } from 'react';
 import type { RouteObject } from 'react-router';
-// Imported directly (not from the `@/pages` barrel) — the barrel statically
-// re-exports every page, which would otherwise defeat the dynamic imports
-// below (Rollup can't split a module into its own chunk if something else
-// still imports it statically through the barrel).
-import { PlaceholderPage } from '@/pages/PlaceholderPage';
 import { AppLayout } from '@/widgets/layout/AppLayout';
 import type { NavLink } from '@/widgets/layout/navLink.types';
 import { ProtectedRoute } from '@/features/authentication/components/ProtectedRoute';
@@ -17,8 +12,10 @@ import { PATHS } from '@/shared/config';
 // differently-sized pages to split on; that's no longer true. Each import
 // points at the page's own module (never the `@/pages` barrel, which would
 // re-bundle every page into one chunk regardless of the dynamic import).
-// PlaceholderPage stays a regular import — it's tiny and shared across many
-// still-unbuilt routes, so splitting it has no payoff.
+// `PlaceholderPage` is no longer referenced here at all (2026-08-05 —
+// CONTENT-005 gave the catch-all `*` route its own real `NotFoundPage`,
+// its only remaining use); it's kept in `pages/` for any future
+// still-unbuilt route that needs a stand-in, per its own doc comment.
 const HomePage = lazy(() => import('@/pages/HomePage').then((m) => ({ default: m.HomePage })));
 const PropertiesPage = lazy(() =>
   import('@/pages/PropertiesPage').then((m) => ({ default: m.PropertiesPage })),
@@ -36,6 +33,10 @@ const ForgotPasswordPage = lazy(() =>
 const ResetPasswordPage = lazy(() =>
   import('@/pages/ResetPasswordPage').then((m) => ({ default: m.ResetPasswordPage })),
 );
+// CONTENT-001/002/005 (user-stories.md Epic 11, added 2026-08-05).
+const AboutPage = lazy(() => import('@/pages/AboutPage').then((m) => ({ default: m.AboutPage })));
+const ContactPage = lazy(() => import('@/pages/ContactPage').then((m) => ({ default: m.ContactPage })));
+const NotFoundPage = lazy(() => import('@/pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
 const ProfilePage = lazy(() =>
   import('@/pages/ProfilePage').then((m) => ({ default: m.ProfilePage })),
 );
@@ -84,6 +85,9 @@ const AdminAnalyticsPage = lazy(() =>
 const AdminActivityLogPage = lazy(() =>
   import('@/pages/AdminActivityLogPage').then((m) => ({ default: m.AdminActivityLogPage })),
 );
+const AdminMessagesPage = lazy(() =>
+  import('@/pages/AdminMessagesPage').then((m) => ({ default: m.AdminMessagesPage })),
+);
 const ModeratorDashboardOverviewPage = lazy(() =>
   import('@/pages/ModeratorDashboardOverviewPage').then((m) => ({
     default: m.ModeratorDashboardOverviewPage,
@@ -130,13 +134,15 @@ export const routeConfig: RouteObject[] = [
       { path: PATHS.public.register, element: <RegisterPage /> },
       { path: PATHS.public.forgotPassword, element: <ForgotPasswordPage /> },
       { path: PATHS.public.resetPassword, element: <ResetPasswordPage /> },
+      { path: PATHS.public.about, element: <AboutPage /> },
+      { path: PATHS.public.contact, element: <ContactPage /> },
       {
         // Any authenticated role — Profile is the one authenticated route
         // that isn't part of any specific role's dashboard.
         element: <ProtectedRoute />,
         children: [{ path: PATHS.authenticated.profile, element: <ProfilePage /> }],
       },
-      { path: '*', element: <PlaceholderPage title="Not Found" /> },
+      { path: '*', element: <NotFoundPage /> },
     ],
   },
   // Four independent, role-owned dashboard route groups (post-Sprint-8
@@ -164,6 +170,7 @@ export const routeConfig: RouteObject[] = [
           { path: PATHS.adminDashboard.agencies, element: <AdminAgenciesPage /> },
           { path: PATHS.adminDashboard.analytics, element: <AdminAnalyticsPage /> },
           { path: PATHS.adminDashboard.activityLogs, element: <AdminActivityLogPage /> },
+          { path: PATHS.adminDashboard.messages, element: <AdminMessagesPage /> },
         ],
       },
     ],

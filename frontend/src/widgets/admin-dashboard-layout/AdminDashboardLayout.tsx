@@ -9,6 +9,7 @@ const NAV_LINKS = [
   { label: 'Agencies', to: PATHS.adminDashboard.agencies },
   { label: 'Analytics', to: PATHS.adminDashboard.analytics },
   { label: 'Activity Log', to: PATHS.adminDashboard.activityLogs },
+  { label: 'Messages', to: PATHS.adminDashboard.messages },
 ];
 
 /**

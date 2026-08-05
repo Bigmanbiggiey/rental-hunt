@@ -13,6 +13,9 @@ export const PATHS = {
     register: '/register',
     forgotPassword: '/forgot-password',
     resetPassword: '/reset-password',
+    // CONTENT-001/002 (user-stories.md Epic 11, added 2026-08-05).
+    about: '/about',
+    contact: '/contact',
   },
   // Every authenticated role has its own independent dashboard route group
   // (post-Sprint-8 restructuring, 2026-08-04 — see decisions.md for the ADR
@@ -29,6 +32,8 @@ export const PATHS = {
     agencies: '/admin-dashboard/agencies',
     analytics: '/admin-dashboard/analytics',
     activityLogs: '/admin-dashboard/activity-logs',
+    // CONTENT-003, added 2026-08-05.
+    messages: '/admin-dashboard/messages',
   },
   // Moderator's own route group, not a role-filtered view inside admin's —
   // reuses the same admin-verification/admin-activity-log feature hooks and
