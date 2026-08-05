@@ -67,8 +67,18 @@ function PropertyMapCanvas({ latitude, longitude, title }: PropertyMapCanvasProp
   // No `role="img"` -- Leaflet renders real interactive controls (zoom
   // buttons, a draggable map, a marker popup) inside; an "img" role would
   // tell assistive tech to collapse all of that into one opaque image.
+  //
+  // `isolate` (found 2026-08-05, mobile booking-flow review): Leaflet's own
+  // CSS gives its zoom control a `z-index: 1000`. `position: relative` alone
+  // doesn't create a new stacking context, so without `isolation: isolate`
+  // that z-index compares directly against the shared `Dialog`'s `z-50`
+  // (shared/ui/dialog.tsx) once it portals to `document.body` -- 1000 > 50
+  // lets the map's zoom control render on top of an open "Book a Viewing"
+  // dialog whenever the map is scrolled into view. `isolate` contains every
+  // Leaflet-internal z-index inside this wrapper for good, regardless of
+  // what other z-50 overlays get added later.
   return (
-    <div className="relative">
+    <div className="relative isolate">
       <div
         ref={containerRef}
         className="h-80 w-full rounded-lg lg:h-[400px]"

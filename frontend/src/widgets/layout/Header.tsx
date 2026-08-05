@@ -6,6 +6,7 @@ import { Sheet, SheetTrigger } from '@/shared/ui/sheet';
 import { useAuth } from '@/entities/user/context/AuthProvider';
 import { useLogout } from '@/features/authentication/hooks/useLogout';
 import { PATHS } from '@/shared/config';
+import { dashboardPathForRole } from './dashboardPathForRole';
 import { MobileNavDrawer } from './MobileNavDrawer';
 import type { NavLink } from './navLink.types';
 
@@ -51,6 +52,9 @@ function Header({ homeHref, primaryLinks }: HeaderProps) {
           {!isLoading &&
             (profile ? (
               <>
+                <Button asChild variant="ghost">
+                  <Link to={dashboardPathForRole(profile.role)}>Go to my dashboard</Link>
+                </Button>
                 <span className="text-body-sm text-muted-foreground">{profile.fullName}</span>
                 <Button variant="outline" onClick={handleLogout} isLoading={isLoggingOut}>
                   Log out

@@ -152,8 +152,12 @@ function LocationPickerMapCanvas({ latitude, longitude, onChange }: LocationPick
     setQuery(result.display_name);
   }
 
+  // `isolate`: same fix as PropertyMapCanvas.tsx — contains Leaflet's own
+  // internal z-index (its zoom control is z-index: 1000) inside this
+  // wrapper so it can never outrank an ancestor-level Dialog/Sheet (z-50)
+  // regardless of where this form ends up being used.
   return (
-    <div className="flex flex-col gap-2">
+    <div className="isolate flex flex-col gap-2">
       <form onSubmit={handleSearch} className="flex gap-2">
         <Input
           value={query}

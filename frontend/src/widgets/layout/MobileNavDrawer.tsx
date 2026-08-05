@@ -5,6 +5,7 @@ import { SheetClose, SheetContent, SheetHeader, SheetTitle } from '@/shared/ui/s
 import { useAuth } from '@/entities/user/context/AuthProvider';
 import { useLogout } from '@/features/authentication/hooks/useLogout';
 import { PATHS } from '@/shared/config';
+import { dashboardPathForRole } from './dashboardPathForRole';
 import type { NavLink } from './navLink.types';
 
 interface MobileNavDrawerProps {
@@ -43,6 +44,11 @@ function MobileNavDrawer({ primaryLinks }: MobileNavDrawerProps) {
           (profile ? (
             <>
               <p className="text-body-sm text-muted-foreground px-3">{profile.fullName}</p>
+              <SheetClose asChild>
+                <Button asChild variant="ghost">
+                  <Link to={dashboardPathForRole(profile.role)}>Go to my dashboard</Link>
+                </Button>
+              </SheetClose>
               <SheetClose asChild>
                 <Button variant="outline" onClick={handleLogout} isLoading={isLoggingOut}>
                   Log out
