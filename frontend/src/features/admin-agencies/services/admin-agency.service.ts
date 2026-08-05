@@ -17,4 +17,14 @@ export const adminAgencyService = {
     const parsed = parseOrThrow(UpdateAgencySchema, input);
     return agencyRepository.update(id, parsed);
   },
+
+  /** Epic 12 — no Zod needed, `approve_agency_application()` takes only an id. */
+  async approveApplication(id: string) {
+    return agencyRepository.approve(id);
+  },
+
+  /** Epic 12 — the RPC itself enforces "reason required," Service just passes it through. */
+  async rejectApplication(id: string, reason: string) {
+    return agencyRepository.reject(id, reason);
+  },
 };

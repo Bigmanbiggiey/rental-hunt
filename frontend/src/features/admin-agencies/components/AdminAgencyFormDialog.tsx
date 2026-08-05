@@ -66,6 +66,13 @@ export function AdminAgencyFormDialog({ agency, open, onOpenChange }: AdminAgenc
       phone: agency?.phone ?? '',
       email: agency?.email ?? '',
       countyId: agency?.countyId ?? '',
+      socialLinks: {
+        facebook: agency?.socialLinks.facebook ?? '',
+        instagram: agency?.socialLinks.instagram ?? '',
+        twitter: agency?.socialLinks.twitter ?? '',
+        linkedin: agency?.socialLinks.linkedin ?? '',
+        website: agency?.socialLinks.website ?? '',
+      },
     },
   });
 
@@ -77,6 +84,13 @@ export function AdminAgencyFormDialog({ agency, open, onOpenChange }: AdminAgenc
       phone: agency?.phone ?? '',
       email: agency?.email ?? '',
       countyId: agency?.countyId ?? '',
+      socialLinks: {
+        facebook: agency?.socialLinks.facebook ?? '',
+        instagram: agency?.socialLinks.instagram ?? '',
+        twitter: agency?.socialLinks.twitter ?? '',
+        linkedin: agency?.socialLinks.linkedin ?? '',
+        website: agency?.socialLinks.website ?? '',
+      },
     });
   }, [agency, reset]);
 
@@ -175,6 +189,30 @@ export function AdminAgencyFormDialog({ agency, open, onOpenChange }: AdminAgenc
             />
             {errors.logoUrl && <FieldError id="agency-logo-url-error">{errors.logoUrl.message}</FieldError>}
           </div>
+
+          <fieldset className="space-y-4">
+            <legend className="text-body-sm font-medium">Social links</legend>
+            <div className="space-y-2">
+              <Label htmlFor="agency-social-website">Website</Label>
+              <Input id="agency-social-website" readOnly={isPending} {...register('socialLinks.website')} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="agency-social-facebook">Facebook</Label>
+              <Input id="agency-social-facebook" readOnly={isPending} {...register('socialLinks.facebook')} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="agency-social-instagram">Instagram</Label>
+              <Input id="agency-social-instagram" readOnly={isPending} {...register('socialLinks.instagram')} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="agency-social-twitter">Twitter / X</Label>
+              <Input id="agency-social-twitter" readOnly={isPending} {...register('socialLinks.twitter')} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="agency-social-linkedin">LinkedIn</Label>
+              <Input id="agency-social-linkedin" readOnly={isPending} {...register('socialLinks.linkedin')} />
+            </div>
+          </fieldset>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
