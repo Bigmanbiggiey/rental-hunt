@@ -27,3 +27,4 @@ export * from './skip-link';
 export * from './calendar';
 export * from './date-picker';
 export * from './time-picker';
+export * from './rating';

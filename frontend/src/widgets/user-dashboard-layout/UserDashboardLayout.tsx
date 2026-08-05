@@ -6,6 +6,10 @@ const NAV_LINKS = [
   { label: 'Overview', to: PATHS.userDashboard.root, end: true },
   { label: 'Favorites', to: PATHS.userDashboard.favorites },
   { label: 'Bookings', to: PATHS.userDashboard.bookings },
+  // Epic 12 — self-service agency registration; not nested under
+  // /user-dashboard (it's its own narrowly-role-gated route), but linking
+  // from here is the one place a customer would naturally discover it.
+  { label: 'Register your agency', to: PATHS.authenticated.agencyRegister },
 ];
 
 /**
