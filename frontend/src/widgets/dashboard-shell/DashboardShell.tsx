@@ -210,7 +210,24 @@ export function DashboardShell({ brandHref, navLabel, navLinks, children }: Dash
         <aside className="border-border hidden w-64 shrink-0 border-r p-4 lg:block">
           <SidebarContent navLabel={navLabel} navLinks={navLinks} />
         </aside>
-        <main id="main-content" className="flex-1 p-4 sm:p-6 lg:p-8">
+        {/*
+          `min-w-0` is load-bearing, not decorative (found 2026-08-05, real-device
+          mobile pass across all four roles): `main` is a flex item in this row
+          (aside + main), and a flex item's default `min-width: auto` refuses to
+          shrink below its content's own unbroken min-content width. At >= lg this
+          never mattered (plenty of horizontal room), but at mobile widths any page
+          whose content is wide enough — a booking card row, a data table, the
+          property gallery — forced the whole page to scroll horizontally instead
+          of the content wrapping/scrolling internally as each of those already
+          does correctly on its own (e.g. `shared/ui/table.tsx`'s own `overflow-auto`
+          wrapper). Confirmed via live testing: 57px overflow on the Customer
+          welcome block, 215px on the admin Contact Messages table, 325px on the
+          Verification Review gallery — all three resolved by this one class.
+          `AppLayout`'s own `<main>` never had this bug: it sits in a column flex,
+          not a row, so cross-axis stretch sets its width directly rather than
+          going through this same content-based minimum-size calculation.
+        */}
+        <main id="main-content" className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">
           <RouteErrorBoundary key={location.pathname}>{children}</RouteErrorBoundary>
         </main>
       </div>
