@@ -587,6 +587,12 @@ Maps `properties.verification_status` (`database.md` §6):
 
 **Behavior:** A fixed-height (`320px` mobile, `400px` desktop) map, single marker at the property's `latitude`/`longitude`, with a visible "Get Directions" button that opens the platform's default external maps app — never an embedded routing UI. The map loads lazily (not blocking the rest of the page) and shows a Skeleton until Leaflet initializes.
 
+**Mobile gesture gating (added 2026-08-05, map-rendering review):** this map sits mid-page, not full-viewport, so Leaflet's default drag/scroll-zoom would otherwise trap a user's vertical swipe or mouse-wheel page-scroll the instant it starts over the map. `dragging`/`touchZoom`/`scrollWheelZoom` start disabled with a "Tap to interact with map" hint; a single tap/click enables them and clears the hint. The zoom +/- control stays always-active throughout (Leaflet's control buttons stop their own click from reaching the map's handler), matching Google Maps' own "cooperative gesture handling" convention. This gate is deliberately **not** applied to §12.11.1's picker map below — see that section for why.
+
+**Touch targets (added 2026-08-05, map-rendering review):** Leaflet's own touch-device zoom control CSS ships at 30×30px, below this doc's own 44×44px minimum (§17's touch-target rule, WCAG 2.2 SC 2.5.8) — overridden via `shared/lib/leaflet-overrides.css`, shared by both this map and §12.11.1's.
+
+**Tile-load failures (added 2026-08-05):** a small inline note ("Some map tiles failed to load. Check your connection.") appears if OpenStreetMap's tile server fails, mirroring §12.11.1's existing location-search error-message convention.
+
 ## 12.11.1 Location Picker (property form)
 
 **Purpose:** Let an agent set a listing's exact `latitude`/`longitude` visually (post-Sprint-8) instead of only typing raw coordinates — same Leaflet/OpenStreetMap stack as §12.11's read-only map, no new mapping dependency.
@@ -594,6 +600,8 @@ Maps `properties.verification_status` (`database.md` §6):
 **Behavior:** A search box (Nominatim/OpenStreetMap geocoding, `countrycodes=ke`) above a `256px`–`320px` map. Typing a place and submitting shows up to 5 candidate results to choose from — never auto-selects the first, since geocoding for informal/local Kenyan addressing is often ambiguous. Clicking anywhere on the map itself also places (or moves) a draggable marker directly. Either path writes straight into the same `latitude`/`longitude` fields the manual number inputs below the map already control — both stay live and editable, so an agent can fine-tune a picked point by typing an exact value, or override the map entirely by typing coordinates with no map interaction at all. No coordinate is ever silently applied without a fields update the agent can see and correct.
 
 **Default view:** if the listing already has coordinates (edit mode), centers there; otherwise fits the whole of Kenya's bounding box rather than guessing a default city, since an agent could be listing anywhere in the country.
+
+**Mobile gesture gating — deliberately different from §12.11 (added 2026-08-05, map-rendering review):** only `scrollWheelZoom` starts disabled here (re-enabled on first click, same mechanism as §12.11). `dragging` is left always-on, unlike the read-only map: this map *is* the form control the agent came to the page to use, so gating pan behind an extra tap would get in the way of its actual job — the click-to-place-a-pin interaction fires on a plain click regardless of `dragging`'s state, so nothing about placing a pin required this gate in the first place.
 
 ## 12.12 Favorite Button
 
