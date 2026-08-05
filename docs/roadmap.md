@@ -290,6 +290,7 @@ This sprint is deliberately **not** feature work — it's the dedicated hardenin
 # 13. Sprint 9 - Production Launch
 
 ## Scope
+- Static & Legal Content (pre-launch prep, `user-stories.md` Epic 11, added 2026-08-05): `CONTENT-001`–`005` — About/How It Works, Contact form + admin review screen, Terms of Service, Privacy Policy, and a genuine 404 page. Folded into this sprint rather than given its own, since Terms/Privacy is a real launch blocker and the rest is small, low-risk static content. **Terms of Service and Privacy Policy content is blocked on the Product Owner supplying real legal/company text** — engineering does not draft binding legal content; this must be resolved before this sprint's DoD can close.
 - Production Build: final production bundle built and smoke-tested locally before deploy.
 - Deployment Validation: Vercel production environment configured with the production Supabase project's credentials (not the dev/staging project used through Sprints 1–8).
 - Database Migration: full migration history (`database.md` §13) replayed clean against the production Supabase project; seed data (§12) replaced with real launch-ready reference data (all 47 counties, a complete amenities list, real agency/agent accounts — not dev fixtures).
@@ -301,6 +302,7 @@ This sprint is deliberately **not** feature work — it's the dedicated hardenin
 - Version 1.0 Launch: tag `v1.0.0` (`coding-standards.md` §23).
 
 ## Release Checklist
+- [ ] `CONTENT-001`–`005` (About, Contact + admin review, Terms, Privacy, 404 page) are built and Terms/Privacy contain real, Product-Owner-approved legal text — not placeholder copy.
 - [ ] All Sprint 0–8 Definitions of Done remain true on the production build (no regression since Sprint 8 closed).
 - [ ] Every item in `requirements.md` §15 ("MVP Success Criteria") is verified true in production, not just staging.
 - [ ] Rollback plan (§20) is understood and has been rehearsed at least once against staging.

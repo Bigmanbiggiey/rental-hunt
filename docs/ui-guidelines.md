@@ -729,6 +729,10 @@ An explicit back affordance (not just relying on the browser back button) appear
 
 All search filters, sort order, and pagination cursors are reflected in the URL query string (`NFR-SEARCH-004`), so any filtered view is bookmarkable and shareable. Dashboard tab states (e.g. "Upcoming" vs. "Completed" viewings) are also reflected in the URL where feasible, so a shared/refreshed link returns to the same view.
 
+## 15.9 Footer
+
+Added 2026-08-05 (§24, `CONTENT-001`/`002`) — `FEAT-010`'s Footer had no link content spec until this point (copyright line only, since Sprint 1). Now: copyright line (left) + a footer nav (right, stacked below on mobile) linking About and Contact. Terms of Service and Privacy Policy are deliberately not linked yet — those pages don't exist until real legal text is supplied (`roadmap.md` §13, `CONTENT-004`); add both links here in the same change that builds them.
+
 ---
 
 # 16. Responsive Behavior
@@ -950,6 +954,24 @@ The following are intentionally deferred beyond the MVP, consistent with `vision
 | **Maps improvements** | Marker clustering, drawn search-radius, custom pin styling | The single-marker Map Section (§12.11) is deliberately simple for MVP; Leaflet supports these as additive plugins. |
 | **Charts** | Interactive, drill-down analytics beyond the basic bar/line views in §13.5 | `AGENT-008`'s MVP scope is intentionally limited to simple counts; the chart component's token-based coloring already generalizes. |
 | **Localization** | Swahili (and other) language support | No component in this system embeds English strings in a way that would resist extraction to an i18n layer; copy is already centralized per §20 rather than scattered inline. |
+
+---
+
+# 24. Static & Legal Content Pages
+
+Added 2026-08-05 (`CONTENT-001`/`002`/`005`, `user-stories.md` Epic 11).
+
+## 24.1 About Page (`/about`)
+
+Reuses `UserDashboardOverviewPage`'s already-established welcome-block anatomy (§13.12) verbatim — tagline `<h1>`, a 3-step "how it works" row, a "Browse Properties" CTA, and static trust chips — since a guest never sees that post-login page at all and the same explanation applies. Not a dashboard component itself; lives in `pages/AboutPage.tsx`, reachable from the Footer (§15).
+
+## 24.2 Contact Page (`/contact`)
+
+A single form (Name, Email, Message) following §14's standard form patterns — `FieldError` per field, `Label` with a visible `*` + `sr-only` "(required)" suffix, submit button `isLoading` during submission. Pre-fills Name/Email for a signed-in user. On success, replaces the form with a confirmation `Alert` (not a toast alone) plus a "Send another message" reset action, since the submitter may want to see the confirmation persist rather than a toast that auto-dismisses.
+
+## 24.3 404 Not Found
+
+Implements §19's already-documented "404" row exactly (heading "We couldn't find that page," the given supporting text, "Back to homepage" action) via `EmptyState` — this is that row's first real consumer. Uses the icon-only (no destructive red) treatment §19 specifies for situational, not-the-user's-fault states.
 
 ---
 

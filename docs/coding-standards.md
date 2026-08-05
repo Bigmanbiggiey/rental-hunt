@@ -209,7 +209,7 @@ function isAppError(error: unknown): error is AppError {
 | **Naming** | Mirrors the Service method it wraps: `useProperties` wraps `propertyService.list`, `useCreateViewingRequest` wraps `viewingRequestService.create`. |
 | **Responsibilities** | One hook, one responsibility — a query hook fetches; it does not also expose a mutation function "for convenience." If a screen needs both, it composes two hooks. |
 | **Side effects** | Side effects (subscriptions, timers, realtime channel setup) live inside the hook that owns the related data, in a single `useEffect` with a complete, correct dependency array and cleanup function — never scattered across the consuming component. |
-| **Query hooks** | Thin wrappers around TanStack Query's `useQuery`, with a project-standard query-key convention (`api-design.md` §23: `['properties', 'list', filters]`) and the Service call as the query function. Return the TanStack result shape directly (`data`, `isLoading`, `isError`, `error`) — components consume that shape, not a custom-reinvented one. |
+| **Query hooks** | Thin wrappers around TanStack Query's `useQuery`, with a project-standard query-key convention (`api-design.md` §24: `['properties', 'list', filters]`) and the Service call as the query function. Return the TanStack result shape directly (`data`, `isLoading`, `isError`, `error`) — components consume that shape, not a custom-reinvented one. |
 | **Mutation hooks** | Wrap `useMutation`, handle cache invalidation (`queryClient.invalidateQueries`) on success, and wire up any Realtime-driven invalidation (`api-design.md` §11) in the same place — a mutation's side effects on the cache are documented in the hook, not left to the calling component to remember. |
 | **Avoid unnecessary state** | Server data is never copied into a component's local `useState` "for convenience" — it's read from the TanStack Query cache every time. Local state is reserved for genuinely local, ephemeral UI state (§9). |
 
@@ -380,7 +380,7 @@ Target: **WCAG 2.2 AA**, restated here as a coding-time checklist (full rational
 
 # 17. API Usage
 
-Restated as a coding rule from `api-design.md` §23 — see that document for full rationale:
+Restated as a coding rule from `api-design.md` §24 — see that document for full rationale:
 
 - **Always go through a Repository.** No component, hook, or service bypasses the Repository to call Supabase directly.
 - **Never call Supabase directly from a component.** This is checked in code review (§26) as a hard blocker, not a style nit.

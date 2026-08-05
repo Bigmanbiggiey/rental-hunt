@@ -207,6 +207,32 @@ Quick view or details action.
 
 ---
 
+## 5.4 Static & Legal Content
+
+Added post-Sprint-8 (2026-08-05): a documentation-drift review found these pages were never scoped, despite `Footer.tsx` flagging the gap since Sprint 1.
+
+### FR-CONTENT-001
+
+A public About / How It Works page must explain what Rental Hunt KE is and the search → compare → book viewing flow, reachable from primary site navigation.
+
+### FR-CONTENT-002
+
+A public Contact page must let a guest or signed-in user submit a name, email, and message. Submissions are stored for admin review; no outbound email delivery is required for MVP.
+
+### FR-CONTENT-003
+
+An admin-only screen must let an admin view, resolve, and delete Contact submissions.
+
+### FR-CONTENT-004
+
+A public Terms of Service page and a public Privacy Policy page must exist before production launch (§13, `roadmap.md` §13). Content requires real legal/company text supplied by the Product Owner — not fabricated by an engineering session.
+
+### FR-CONTENT-005
+
+The catch-all not-found route must render a genuine "page not found" message distinct from the in-development `PlaceholderPage` copy used for unbuilt routes.
+
+---
+
 # 6. Property Details Requirements
 
 ## 6.1 Core Information

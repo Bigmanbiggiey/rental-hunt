@@ -639,6 +639,36 @@ Conventions used throughout this section:
 
 ---
 
+## 5.16 `contact_messages`
+
+**Purpose:** Public Contact form submissions (`CONTENT-002`/`003`, `user-stories.md` Epic 11), added 2026-08-05. Stored for admin review — no outbound email provider exists in this project (ADR-034); `api-design.md` §24 documents the API/repository contract.
+
+| Column | Type | Nullable | Description |
+|---|---|---|---|
+| `id` | `uuid` | No | Primary key. |
+| `user_id` | `uuid` | Yes | Defaults to `auth.uid()`. Nullable — a guest can submit without an account. |
+| `name` | `text` | No | `CHECK (char_length(btrim(name)) > 0)`. |
+| `email` | `text` | No | `CHECK (char_length(btrim(email)) > 0)`. Not validated as a real address at the DB layer — Zod handles format validation (`api-design.md` §14); the constraint here only backstops "not blank." |
+| `message` | `text` | No | `CHECK (char_length(btrim(message)) BETWEEN 10 AND 2000)`. |
+| `is_resolved` | `boolean` | No | Default `false`. |
+| `created_at` | `timestamptz` | No | Default `now()`. |
+
+**Primary Key:** `id`
+**Foreign Keys:** `user_id` → `profiles.id` (`ON DELETE SET NULL`) — a submitted message outlives the submitter's account, matching `activity_logs.actor_id`'s precedent (§5.14).
+**Indexes:**
+- `created_at` (admin queue, newest-first).
+- Partial `created_at WHERE NOT is_resolved` (the admin queue's default, most common filter).
+- `(email, created_at)` — backs the Service-layer rate-limit counter (`api-design.md` §18): a guest submitter has no stable id, so recent-submission counting is keyed by email, not `user_id`.
+
+**Write path:** Any caller (`anon` or `authenticated`) may `INSERT`; the `WITH CHECK` clause requires `user_id IS NOT DISTINCT FROM auth.uid()`, so an authenticated caller cannot spoof another user's `user_id` (a guest's `NULL` is allowed). Only `admin` may `SELECT`/`UPDATE`/`DELETE` — not moderator, since this is correspondence/support triage, not verification or activity oversight.
+
+**Two real pitfalls found via failing integration tests, not assumed from the policy table alone — both trace to the same root cause: no role but admin has any SELECT access to this table, not even a submitter's own row.**
+
+1. **A submitter cannot read back their own inserted row.** A guest has no `auth.uid()` for a self-scoped policy to key off regardless. `contactMessageRepository.submit()` (`api-design.md` §23.1) therefore never chains `.select()` after `.insert()`, unlike this project's usual insert-then-return-representation pattern elsewhere (e.g. `agencyRepository.create()`) — doing so fails with `42501`, since PostgREST's `.select()` after a write requires the caller to also be able to read the row back. **General rule: before adding `.select()` after an `.insert()`/`.update()`, confirm the RLS Policy Summary actually grants that caller SELECT on the affected row — "I can write it" does not imply "I can read what I just wrote."**
+2. **Even a `head: true` count-only query needs the SELECT grant.** The rate-limit check (`api-design.md` §18) needs "how many messages has this email sent recently," which looks read-only enough to seem harmless — but `.select('*', { count: 'exact', head: true })` still requires a table-level SELECT grant to execute at all; `anon` has none, and the request fails with a bare `401`, not a friendlier RLS-filtered "0 rows." Fixed with a narrow `security definer` RPC, `count_recent_contact_messages_by_email(p_email, p_since)` (mirroring `current_role()`/`property_ids_with_all_amenities()`'s existing pattern) that returns only a count, never row data — elevated privilege scoped to exactly the one query shape that needs it, not a broader SELECT grant. **General rule: a `head: true` count is not exempt from the same grant requirement as a normal SELECT — plan for a `security definer` counting RPC anywhere a rate limit needs to count rows a role otherwise can't read.**
+
+---
+
 # 6. Enumerations
 
 Enums are used for small, fixed, code-coupled state machines. Reference data that may grow or be edited by admins (property types, counties, locations, amenities) intentionally uses tables instead — see §2, principle 8, and the rationale in §4.4.
@@ -801,6 +831,7 @@ end if;
 | `viewing_requests` | No access | SELECT/INSERT own rows; UPDATE own row only to set `status = 'cancelled'` while `status IN ('pending','confirmed')` | SELECT/UPDATE rows where `agent_id` is their own (confirm, reschedule, cancel, complete, no-show) | SELECT all | Full CRUD |
 | `activity_logs` | No access | No access | No access (agents do not read the audit trail in MVP) | SELECT | SELECT; DELETE for retention/GDPR purposes only |
 | `property_verifications` | No access | No access | SELECT for own agency's properties (transparency into why a listing was verified/rejected) | SELECT all | SELECT all; `INSERT` only via the `set_property_verification()` RPC — no role has a direct table `INSERT`/`UPDATE`/`DELETE` grant, including admin |
+| `contact_messages` | INSERT own submission only (`user_id IS NULL`) | INSERT own submission only (`user_id = auth.uid()`, enforced) | No access (not a support/admin role) | No access (admin-only triage, not verification/activity oversight) | Full CRUD |
 
 **Column-level note on `profiles.role`:** RLS cannot restrict a single column within a row-level `UPDATE` policy, so self-role-elevation is prevented by a trigger (`prevent_self_role_change()`) that raises an exception if a non-admin attempts to change their own `role`. Admins bypass the trigger.
 

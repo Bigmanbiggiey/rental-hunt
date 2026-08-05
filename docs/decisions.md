@@ -950,6 +950,23 @@ Two real UX decisions for the idle timeout (duration; warn-then-sign-out vs. sil
 
 ---
 
+## ADR-034: Contact form stores messages for admin review only — no outbound email provider in MVP
+
+**Status:** Accepted
+**Date:** 2026-08-05
+
+**Decision:** `CONTENT-002`/`003` (`user-stories.md` Epic 11) — a public Contact form — writes to a new `contact_messages` table (`database.md` §5.16) for an admin to read, resolve, and delete through a new admin-dashboard screen. No outbound email is sent to the Rental Hunt KE team or back to the submitter; there is no email-sending provider (Resend, Postmark, SES, etc.) anywhere in this project, and this ADR deliberately does not introduce one.
+
+**Context:** The Static & Legal Content survey (`project-state.md`, 2026-08-05) found a Contact page was never scoped anywhere, and — separately — that a prior, unfinished session had already attempted this exact table (an orphaned migration, discarded, citing this same ADR number before it existed). Two shapes were available: admin-review-only (the submitter's message sits in a queue an admin actively checks) or real outbound delivery (the submission triggers an actual email to a real inbox, as `AUTH-004`'s password-reset flow already does via Supabase Auth's own built-in email sending). Put to the developer via `AskUserQuestion` rather than assumed — chosen: **admin-review-only**.
+
+**Rationale:** Supabase Auth's built-in email sending (used for registration confirmation and password reset) is scoped to Auth events specifically — it has no general-purpose "send this arbitrary message" API, so a Contact form notification would require standing up an entirely new provider, API key, and Edge Function, none of which any other part of this project currently touches. That's real new infrastructure for a feature whose only hard requirement (`FR-CONTENT-002`) is that a submission is captured and answerable, not that it round-trips through email. The admin-review model reuses every pattern this project already has — a Repository-backed table, RLS, an admin-dashboard list screen (`features/admin-activity-log`'s shape is the direct precedent) — with zero new infrastructure.
+
+**Consequences:** A submitter gets no automatic confirmation that their message was sent (no "we've received your message" email) — acceptable for MVP since the same is true of nothing else in this project depending on outbound mail beyond Supabase Auth's own. If real email delivery is ever wanted (e.g., notifying admin the moment a new message arrives, or confirming receipt to the submitter), it is new scope requiring its own ADR and provider decision, not an extension of this one. `contact_messages.email` is stored specifically so a human admin can reply manually outside the platform in the meantime.
+
+**Related Documents:** `database.md` §5.16, `api-design.md` §24, `user-stories.md` Epic 11 (`CONTENT-002`/`003`), `roadmap.md` §13 (Sprint 9 scope), `project-state.md` (2026-08-05 Recent Changes/Technical Debt — the orphaned-migration incident this ADR resolves).
+
+---
+
 # Future ADR Process
 
 | Aspect | Rule |

@@ -770,6 +770,7 @@ All routes below require `moderator` or `admin` (verification/viewing oversight)
 | Verification Action | see §6.9 | `verificationRepository.setStatus()` (`entities/property-verification`) | Moderator, Admin | Same RPC as the Agent Dashboard's verification screen. Now submitted from the bottom of the review page above (`VerificationActionBar`) instead of a separate dialog. |
 | Activity Logs | `GET /admin/activity-logs` | `activityLogRepository.list(filters)`, `.delete(id)` (`features/admin-activity-log`) | Moderator (read), Admin (read + retention delete) | Filterable by `entityType`, `entityId`, `actorId`, date range. |
 | Analytics | `GET /admin/analytics` | `adminAnalyticsRepository.getAnalytics(range)` (`features/admin-analytics`) | Admin | Aggregates total listing views, viewing-request volume in range, and per-agency listing counts (`AGENT-008` at the platform level) — client-side grouped from plain row lists, mirroring `agentAnalyticsRepository.listPropertyAnalytics()`'s existing shape, not a new SQL aggregation function. |
+| Contact Messages | `GET /contact-messages`, `PATCH /contact-messages/:id`, `DELETE /contact-messages/:id` | `contactMessageRepository.list()`, `.setResolved()`, `.delete()` (`entities/contact-message`) | Admin | Added 2026-08-05 (`CONTENT-003`). See §23 for the full contract, including the public submission endpoint. Admin-only, not moderator — support/correspondence triage, not verification or activity oversight. |
 
 ---
 
@@ -822,7 +823,7 @@ Backed by Supabase Realtime's `postgres_changes` (row-level change feed, RLS-awa
 | Booking Cancelled | *(subset of the above, `status = 'cancelled'`)* | `{ viewingRequestId, cancelledBy, reason }` | Same as above | Immediate reflection of `VIEW-004`/`BOOK-004`. |
 | Notification Created *(Future)* | `postgres_changes` on `notifications`, filter `profile_id=eq.<id>` | `{ id, type, payload }` | The owning profile | Backs a future in-app notification bell; no MVP consumer since `notifications` doesn't exist yet (`database.md` §15). |
 
-**Subscription pattern:** each Hook that needs realtime data (e.g. `useViewingRequests`) opens its `postgres_changes` subscription in a `useEffect`, and on any event simply invalidates the corresponding TanStack Query cache key (§23) rather than manually patching local state — letting the existing `list`/`get` Repository methods remain the single source of truth for shape.
+**Subscription pattern:** each Hook that needs realtime data (e.g. `useViewingRequests`) opens its `postgres_changes` subscription in a `useEffect`, and on any event simply invalidates the corresponding TanStack Query cache key (§24) rather than manually patching local state — letting the existing `list`/`get` Repository methods remain the single source of truth for shape.
 
 ---
 
@@ -1192,6 +1193,7 @@ Supabase does not provide general-purpose application-level rate limiting out of
 | Login / Register / Password Reset | 5 attempts per 15 minutes, per IP + email combination | Supabase Auth (built-in) + Cloudflare rule | Brute-force and credential-stuffing protection (`SYS-001`). |
 | Viewing Request creation | 10 per hour, per customer | Service layer (count recent rows via `viewingRequestRepository`) | Prevents spam bookings from tying up agent queues. |
 | Image Upload | 20 per hour, per agent | Service layer | Storage cost/abuse control; well above any legitimate single-listing need (a listing typically has <15 images). |
+| Contact Message submission | 5 per hour, per email address | Service layer (`contactMessageRepository.countRecentByEmail()`, backed by the `count_recent_contact_messages_by_email` `security definer` RPC — `database.md` §9's pitfall note explains why a plain SELECT count doesn't work here) | Spam/abuse control on a form reachable by anyone, including guests with no stable account id — keyed by email rather than `user_id` for that reason (§23.1). |
 | Search (`GET /properties`) | 60 requests per minute, per IP | Cloudflare rule | Generous enough for real usage and pagination scrolling; blocks basic scraping without hindering renters. |
 | Future Public API | Per-API-key daily quota (e.g. 1,000 requests/day on the free tier) | Edge Function gateway (§22) | Standard practice once the API has external consumers who aren't the first-party frontend. |
 
@@ -1253,7 +1255,54 @@ The API described in this document is **internal-only** for the MVP — it is th
 
 ---
 
-# 23. Claude Code Implementation Rules
+# 23. Contact API
+
+Added 2026-08-05 (`CONTENT-002`/`003`, `user-stories.md` Epic 11; `database.md` §5.16; ADR-034). No dedicated top-level "Public API" section existed for a guest-facing form outside Property/Favorites/Viewing Request, so this is a new section rather than a subsection of one of those.
+
+## 23.1 Submit Contact Message
+
+| | |
+|---|---|
+| **Method / Route** | `POST /contact-messages` |
+| **Repository Function** | `contactMessageRepository.submit(input: { name, email, message }): Promise<void>` (`entities/contact-message`) |
+| **Permissions** | Guest, Customer, Agent, Moderator, Admin — anyone. `user_id` is set server-side from the caller's session (`NULL` for a guest), never client-supplied. |
+| **Validation** | Zod at the Service layer (`features/contact`): `name` non-blank, `email` a valid address, `message` 10–2000 characters. Backed by the same `CHECK` constraints at the DB layer (`database.md` §5.16). |
+| **Notes** | Returns `void`, not the created row — see `database.md` §9's pitfall notes. No role but admin can read this table, including the submitter's own row, so the Repository never chains `.select()` after `.insert()`; the rate-limit count above goes through a `security definer` RPC for the same underlying reason. |
+| **Rate Limiting** | 5 submissions per hour, per email address (§18) — the Service layer counts recent rows via `contactMessageRepository.countRecentByEmail()` before validation, mirroring `viewingRequestService.create()`'s existing pattern. |
+| **Errors** | `VALIDATION_ERROR`, `RATE_LIMITED` |
+
+## 23.2 List Contact Messages (Admin)
+
+| | |
+|---|---|
+| **Method / Route** | `GET /contact-messages` |
+| **Repository Function** | `contactMessageRepository.list(filters?: { isResolved?: boolean })` (`entities/contact-message`) |
+| **Permissions** | Admin only. |
+| **Notes** | Newest-first, unlike the Verification Queue's oldest-first (there's no fairness concern here — a support queue is read by whoever's triaging it, not competed over). |
+
+## 23.3 Resolve / Unresolve Contact Message (Admin)
+
+| | |
+|---|---|
+| **Method / Route** | `PATCH /contact-messages/:id` |
+| **Repository Function** | `contactMessageRepository.setResolved(id, isResolved: boolean)` (`entities/contact-message`) |
+| **Permissions** | Admin only. |
+| **Errors** | `FORBIDDEN` |
+
+## 23.4 Delete Contact Message (Admin)
+
+| | |
+|---|---|
+| **Method / Route** | `DELETE /contact-messages/:id` |
+| **Repository Function** | `contactMessageRepository.delete(id)` (`entities/contact-message`) |
+| **Permissions** | Admin only. |
+| **Errors** | `FORBIDDEN` |
+
+`entities/contact-message` (not a `features/` slice) per the ADR-026/028 "2+ real consumers" test — `features/contact`'s public submission and `features/admin-messages`'s review screen are two independent consumers of the same repository.
+
+---
+
+# 24. Claude Code Implementation Rules
 
 1. **Never call Supabase directly from a React component.** Every data access goes through a Hook → Service → Repository chain (§2.1). A `supabase.from(...)` or `supabase.auth.*` call appearing inside `pages/`, `widgets/`, `features/*/components`, or `shared/ui` is a defect.
 2. **Always go through the Repository defined for that resource.** If an operation isn't in §13, extend the relevant Repository interface first — don't reach for a raw Supabase call as a shortcut, even "just this once."

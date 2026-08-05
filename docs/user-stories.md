@@ -896,6 +896,82 @@ Every story includes:
 
 ---
 
+# Epic 11 - Static & Legal Content
+
+> Added post-Sprint-8 (2026-08-05): a documentation-drift review found these pages were never scoped, despite `Footer.tsx` flagging the content gap since Sprint 1. Folded into Sprint 9 (Production Launch) as pre-launch prep scope per `roadmap.md` §13, rather than a dedicated sprint — see `roadmap.md` for placement.
+
+## CONTENT-001
+**Priority:** Medium
+**Epic:** Static & Legal Content
+**Title:** About / How It Works Page
+
+**User Story:** As a guest, I want to learn what Rental Hunt KE is and how it works, so that I can trust the platform before creating an account.
+
+**Acceptance Criteria:**
+- A public `/about` route renders the platform's mission and a "how it works" walkthrough (search → compare → book a viewing).
+- Reachable from the site footer, which currently has no navigation links.
+- Fully static content — no new schema or API contract.
+
+---
+
+## CONTENT-002
+**Priority:** Medium
+**Epic:** Static & Legal Content
+**Title:** Contact / Support Form
+
+**User Story:** As a guest or customer, I want to send a message to the Rental Hunt KE team, so that I can get help or ask a question.
+
+**Acceptance Criteria:**
+- A public `/contact` route offers a form (name, email, message), pre-filled with name/email when signed in.
+- Submission is stored for admin review; no outbound email is sent (developer decision, 2026-08-05 — admin-review-only for MVP).
+- Submission is rate-limited using the same per-user/IP counter pattern already built for viewing-request creation and image upload (`api-design.md` §18).
+- Guest submissions cannot spoof another user's `user_id`.
+
+---
+
+## CONTENT-003
+**Priority:** Medium
+**Epic:** Static & Legal Content
+**Title:** Admin Contact Message Review
+
+**User Story:** As an admin, I want to view, resolve, and delete Contact form submissions, so that customer inquiries don't go unanswered.
+
+**Acceptance Criteria:**
+- A new admin-dashboard screen lists submissions, newest first, with an unresolved/resolved filter.
+- An admin can mark a submission resolved or delete it.
+- Only the admin role can read, update, or delete submissions — enforced by RLS, not just UI.
+
+---
+
+## CONTENT-004
+**Priority:** Medium
+**Epic:** Static & Legal Content
+**Title:** Terms of Service & Privacy Policy Pages
+
+**User Story:** As a guest, I want to read the platform's Terms of Service and Privacy Policy, so that I understand my rights, obligations, and what data is collected before using the platform.
+
+**Acceptance Criteria:**
+- Public `/terms` and `/privacy` routes exist and are linked from the footer.
+- Legal/company text is supplied by the Product Owner — engineering does not draft binding legal content.
+- Privacy Policy accurately describes real data collection (Supabase Auth, `profiles`, `favorites`, `viewing_requests`, and — once built — `contact_messages`).
+- Must exist before Sprint 9's `v1.0.0` production launch tag (`roadmap.md` §13).
+
+---
+
+## CONTENT-005
+**Priority:** Low
+**Epic:** Static & Legal Content
+**Title:** Genuine 404 Not-Found Page
+
+**User Story:** As a guest who navigates to a URL that doesn't exist, I want a clear "page not found" message, so that I understand the page genuinely doesn't exist rather than being unbuilt.
+
+**Acceptance Criteria:**
+- The catch-all route renders a dedicated `NotFoundPage`, not the in-development `PlaceholderPage`.
+- Copy is unambiguous ("page not found," not "not yet implemented") and includes a link back to the homepage or `/properties`.
+- No schema or API change.
+
+---
+
 # MVP Scope Summary (Version 1.0)
 
 Per the [vision document](./vision.md#minimum-viable-product-mvp), the MVP validates a single hypothesis: people are willing to use a trusted digital platform to discover rental properties and book physical viewings.
@@ -912,6 +988,7 @@ Per the [vision document](./vision.md#minimum-viable-product-mvp), the MVP valid
 | 8. Customer Dashboard | ✅ Yes |
 | 9. System Behavior | ✅ Yes (cross-cutting, applies to all epics above) |
 | 10. Future Enhancements | ❌ No — explicitly deferred |
+| 11. Static & Legal Content | ✅ Yes (folded into Sprint 9 pre-launch prep) |
 
 ---
 
@@ -979,6 +1056,11 @@ Per the [vision document](./vision.md#minimum-viable-product-mvp), the MVP valid
 | FUT-004 | Future Enhancements | Explicitly Deferred Features — Multi-agency SaaS support |
 | FUT-005 | Future Enhancements | Explicitly Deferred Features — AI property recommendations |
 | FUT-006 | Future Enhancements | Explicitly Deferred Features — Native iOS/Android apps |
+| CONTENT-001 | Static & Legal Content | FR-CONTENT-001 |
+| CONTENT-002 | Static & Legal Content | FR-CONTENT-002 |
+| CONTENT-003 | Static & Legal Content | FR-CONTENT-003 |
+| CONTENT-004 | Static & Legal Content | FR-CONTENT-004 |
+| CONTENT-005 | Static & Legal Content | FR-CONTENT-005 |
 
 ---
 
