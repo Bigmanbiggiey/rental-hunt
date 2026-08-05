@@ -1,4 +1,4 @@
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { AlertCircle } from 'lucide-react';
 import {
@@ -6,6 +6,7 @@ import {
   AlertDescription,
   AlertTitle,
   Button,
+  DatePicker,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -13,18 +14,14 @@ import {
   DialogHeader,
   DialogTitle,
   FieldError,
-  Input,
   Label,
+  TimePicker,
 } from '@/shared/ui';
 import { isAppError } from '@/shared/lib/errors';
 import {
   RescheduleViewingRequestSchema,
   type RescheduleViewingRequestInput,
 } from '../schemas/rescheduleViewingRequest.schema';
-
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 // BOOK-003. Mirrors BookingRequestDialog's controlled-Dialog shape.
 export function RescheduleBookingDialog({
@@ -41,13 +38,17 @@ export function RescheduleBookingDialog({
   error?: unknown;
 }) {
   const {
-    register,
+    control,
     handleSubmit,
     reset,
     formState: { errors },
   } = useForm<RescheduleViewingRequestInput>({
     resolver: zodResolver(RescheduleViewingRequestSchema),
     mode: 'onBlur',
+    // requestedDate/requestedTime are Controller-driven (DatePicker/TimePicker,
+    // not native inputs register() can attach to) — an explicit default keeps
+    // field.value a string from the start instead of undefined.
+    defaultValues: { requestedDate: '', requestedTime: '' },
   });
 
   const onSubmit = handleSubmit((values) => onConfirm(values));
@@ -81,14 +82,19 @@ export function RescheduleBookingDialog({
               New date <span aria-hidden="true">*</span>
               <span className="sr-only"> (required)</span>
             </Label>
-            <Input
-              id="reschedule-date"
-              type="date"
-              min={today()}
-              aria-invalid={!!errors.requestedDate}
-              aria-describedby={errors.requestedDate ? 'reschedule-date-error' : undefined}
-              readOnly={isPending}
-              {...register('requestedDate')}
+            <Controller
+              name="requestedDate"
+              control={control}
+              render={({ field }) => (
+                <DatePicker
+                  id="reschedule-date"
+                  value={field.value}
+                  onChange={field.onChange}
+                  disabled={isPending}
+                  aria-invalid={!!errors.requestedDate}
+                  aria-describedby={errors.requestedDate ? 'reschedule-date-error' : undefined}
+                />
+              )}
             />
             {errors.requestedDate && (
               <FieldError id="reschedule-date-error">{errors.requestedDate.message}</FieldError>
@@ -100,13 +106,19 @@ export function RescheduleBookingDialog({
               New time <span aria-hidden="true">*</span>
               <span className="sr-only"> (required)</span>
             </Label>
-            <Input
-              id="reschedule-time"
-              type="time"
-              aria-invalid={!!errors.requestedTime}
-              aria-describedby={errors.requestedTime ? 'reschedule-time-error' : undefined}
-              readOnly={isPending}
-              {...register('requestedTime')}
+            <Controller
+              name="requestedTime"
+              control={control}
+              render={({ field }) => (
+                <TimePicker
+                  id="reschedule-time"
+                  value={field.value}
+                  onChange={field.onChange}
+                  disabled={isPending}
+                  aria-invalid={!!errors.requestedTime}
+                  aria-describedby={errors.requestedTime ? 'reschedule-time-error' : undefined}
+                />
+              )}
             />
             {errors.requestedTime && (
               <FieldError id="reschedule-time-error">{errors.requestedTime.message}</FieldError>

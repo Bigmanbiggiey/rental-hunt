@@ -1,4 +1,4 @@
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
@@ -7,6 +7,7 @@ import {
   AlertDescription,
   AlertTitle,
   Button,
+  DatePicker,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -14,9 +15,9 @@ import {
   DialogHeader,
   DialogTitle,
   FieldError,
-  Input,
   Label,
   Textarea,
+  TimePicker,
 } from '@/shared/ui';
 import { isAppError } from '@/shared/lib/errors';
 import type { Property } from '@/entities/property';
@@ -25,10 +26,6 @@ import {
   CreateViewingRequestSchema,
   type CreateViewingRequestInput,
 } from '../schemas/createViewingRequest.schema';
-
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 // ui-guidelines.md §11.10/§12.14 — a controlled Dialog (no internal
 // DialogTrigger, the trigger is entities/property's ViewingCTA living
@@ -45,12 +42,17 @@ export function BookingRequestDialog({
   const { mutate, isPending, error, reset } = useCreateViewingRequest();
   const {
     register,
+    control,
     handleSubmit,
     reset: resetForm,
     formState: { errors },
   } = useForm<CreateViewingRequestInput>({
     resolver: zodResolver(CreateViewingRequestSchema),
     mode: 'onBlur',
+    // requestedDate/requestedTime are Controller-driven (DatePicker/TimePicker,
+    // not native inputs register() can attach to) — an explicit default keeps
+    // field.value a string from the start instead of undefined.
+    defaultValues: { requestedDate: '', requestedTime: '', notes: '' },
   });
 
   const onSubmit = handleSubmit((values) => {
@@ -98,14 +100,19 @@ export function BookingRequestDialog({
               Preferred date <span aria-hidden="true">*</span>
               <span className="sr-only"> (required)</span>
             </Label>
-            <Input
-              id="requestedDate"
-              type="date"
-              min={today()}
-              aria-invalid={!!errors.requestedDate}
-              aria-describedby={errors.requestedDate ? 'requestedDate-error' : undefined}
-              readOnly={isPending}
-              {...register('requestedDate')}
+            <Controller
+              name="requestedDate"
+              control={control}
+              render={({ field }) => (
+                <DatePicker
+                  id="requestedDate"
+                  value={field.value}
+                  onChange={field.onChange}
+                  disabled={isPending}
+                  aria-invalid={!!errors.requestedDate}
+                  aria-describedby={errors.requestedDate ? 'requestedDate-error' : undefined}
+                />
+              )}
             />
             {errors.requestedDate && (
               <FieldError id="requestedDate-error">{errors.requestedDate.message}</FieldError>
@@ -117,13 +124,19 @@ export function BookingRequestDialog({
               Preferred time <span aria-hidden="true">*</span>
               <span className="sr-only"> (required)</span>
             </Label>
-            <Input
-              id="requestedTime"
-              type="time"
-              aria-invalid={!!errors.requestedTime}
-              aria-describedby={errors.requestedTime ? 'requestedTime-error' : undefined}
-              readOnly={isPending}
-              {...register('requestedTime')}
+            <Controller
+              name="requestedTime"
+              control={control}
+              render={({ field }) => (
+                <TimePicker
+                  id="requestedTime"
+                  value={field.value}
+                  onChange={field.onChange}
+                  disabled={isPending}
+                  aria-invalid={!!errors.requestedTime}
+                  aria-describedby={errors.requestedTime ? 'requestedTime-error' : undefined}
+                />
+              )}
             />
             {errors.requestedTime && (
               <FieldError id="requestedTime-error">{errors.requestedTime.message}</FieldError>

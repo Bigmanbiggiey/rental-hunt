@@ -29,3 +29,13 @@ globalThis.ResizeObserver ??= ResizeObserverStub as unknown as typeof ResizeObse
 // list) calls it internally to keep the highlighted item in view, first
 // exercised by a test in the post-Sprint-8 property-form work (2026-08-04).
 Element.prototype.scrollIntoView ??= () => {};
+
+// jsdom also has no Pointer Capture API — Radix `Select` calls
+// `hasPointerCapture`/`setPointerCapture`/`releasePointerCapture` on pointer
+// events internally; without a stub, opening/selecting throws a real
+// `TypeError` mid-test. First exercised by a real test in the 2026-08-05
+// TimePicker work (`RescheduleBookingDialog.test.tsx`) — no prior test had
+// ever driven a `Select` through a real click before.
+Element.prototype.hasPointerCapture ??= () => false;
+Element.prototype.setPointerCapture ??= () => {};
+Element.prototype.releasePointerCapture ??= () => {};
