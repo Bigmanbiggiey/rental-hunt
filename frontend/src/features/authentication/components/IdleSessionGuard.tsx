@@ -1,15 +1,15 @@
 import { useCallback } from 'react';
 import { toast } from 'sonner';
 import { useAuth } from '@/entities/user';
+import { Button } from '@/shared/ui/button';
 import {
-  Button,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/shared/ui';
+} from '@/shared/ui/dialog';
 import { useIdleTimer } from '../hooks/useIdleTimer';
 import { useLogout } from '../hooks/useLogout';
 

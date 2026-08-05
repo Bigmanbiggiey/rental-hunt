@@ -1,7 +1,11 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { AlertCircle, MailCheck } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle, Button, FieldError, Input, Label } from '@/shared/ui';
+import { Alert, AlertDescription, AlertTitle } from '@/shared/ui/alert';
+import { Button } from '@/shared/ui/button';
+import { FieldError } from '@/shared/ui/field-error';
+import { Input } from '@/shared/ui/input';
+import { Label } from '@/shared/ui/label';
 import { isAppError } from '@/shared/lib/errors';
 import { useRequestPasswordReset } from '../hooks/useRequestPasswordReset';
 import {
