@@ -1,0 +1,11 @@
+/* ui-guidelines.md: minimum 44x44px touch target for every interactive
+   control on touch devices (WCAG 2.2 SC 2.5.8). Leaflet's own touch-device
+   rule (leaflet.css's `.leaflet-touch .leaflet-bar a`) ships at 30x30px --
+   found via the 2026-08-05 map-rendering review, overridden here since both
+   map canvases share this same control. Imported after leaflet.css so the
+   cascade favors this rule at equal specificity. */
+.leaflet-touch .leaflet-bar a {
+  width: 44px;
+  height: 44px;
+  line-height: 44px;
+}

@@ -1,16 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
 import { Loader2, Search } from 'lucide-react';
 import { Button, Input } from '@/shared/ui';
-
-// Same well-known Leaflet+bundler workaround as PropertyMapCanvas.tsx.
-delete (L.Icon.Default.prototype as { _getIconUrl?: unknown })._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-});
+import { addOsmTileLayer } from '@/shared/lib/leaflet';
 
 // Kenya's real bounding box — the same values CreatePropertySchema already
 // validates latitude/longitude against, so a pin can never land somewhere
@@ -44,6 +36,7 @@ function LocationPickerMapCanvas({ latitude, longitude, onChange }: LocationPick
   const [results, setResults] = useState<NominatimResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [hasTileError, setHasTileError] = useState(false);
 
   const hasInitialPoint = typeof latitude === 'number' && typeof longitude === 'number' && !Number.isNaN(latitude) && !Number.isNaN(longitude);
 
@@ -51,9 +44,17 @@ function LocationPickerMapCanvas({ latitude, longitude, onChange }: LocationPick
     if (!containerRef.current) return;
 
     const map = L.map(containerRef.current);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    }).addTo(map);
+    addOsmTileLayer(map, () => setHasTileError(true));
+    // Unlike PropertyMapCanvas.tsx's read-only display map, dragging/pinch
+    // stay always-on here -- this map IS the form control the agent came to
+    // this page to use, so gating pan behind an extra tap would get in the
+    // way of its actual job. Only scroll-wheel zoom is disabled by default,
+    // since that's a passive hover-driven behavior that can otherwise hijack
+    // an agent's scroll through the rest of a long form. Re-enabled on the
+    // map's first click, same as the property detail map's activation gate.
+    // Found and fixed 2026-08-05 map-rendering review.
+    map.scrollWheelZoom.disable();
+    map.once('click', () => map.scrollWheelZoom.enable());
 
     if (hasInitialPoint) {
       map.setView([latitude, longitude], DEFAULT_ZOOM);
@@ -189,6 +190,9 @@ function LocationPickerMapCanvas({ latitude, longitude, onChange }: LocationPick
         className="h-64 w-full rounded-lg lg:h-80"
         aria-label="Click or tap anywhere on the map to set this listing's exact location; drag the pin to fine-tune it."
       />
+      {hasTileError && (
+        <p className="text-body-sm text-muted-foreground">Some map tiles failed to load. Check your connection.</p>
+      )}
       <p className="text-body-sm text-muted-foreground">
         Click the map to place a pin, drag it to fine-tune, or search above. Latitude/longitude below update
         automatically — you can also type them in directly.
