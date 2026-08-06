@@ -37,6 +37,10 @@ const ResetPasswordPage = lazy(() =>
 // (About) was reworked 2026-08-05 into a section on HomePage itself rather
 // than its own route — see HomePage.tsx.
 const ContactPage = lazy(() => import('@/pages/ContactPage').then((m) => ({ default: m.ContactPage })));
+// CONTENT-004 (Sprint 10, added 2026-08-06) — previously blocked on real
+// legal text; built now with boilerplate content, see TermsPage.tsx's own note.
+const TermsPage = lazy(() => import('@/pages/TermsPage').then((m) => ({ default: m.TermsPage })));
+const PrivacyPage = lazy(() => import('@/pages/PrivacyPage').then((m) => ({ default: m.PrivacyPage })));
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
 const ProfilePage = lazy(() =>
   import('@/pages/ProfilePage').then((m) => ({ default: m.ProfilePage })),
@@ -148,6 +152,8 @@ export const routeConfig: RouteObject[] = [
       { path: PATHS.public.forgotPassword, element: <ForgotPasswordPage /> },
       { path: PATHS.public.resetPassword, element: <ResetPasswordPage /> },
       { path: PATHS.public.contact, element: <ContactPage /> },
+      { path: PATHS.public.terms, element: <TermsPage /> },
+      { path: PATHS.public.privacy, element: <PrivacyPage /> },
       // Epic 12's public Agency Profile Page — a guest-reachable dynamic
       // route, same shape as propertyDetail above.
       { path: PATHS.public.agencyDetail, element: <AgencyDetailPage /> },

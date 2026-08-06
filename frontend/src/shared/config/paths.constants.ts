@@ -19,6 +19,13 @@ export const PATHS = {
     // Epic 12 — the public Agency Profile Page (properties/agents/reviews
     // under one agency), mirroring `propertyDetail`'s exact shape.
     agencyDetail: '/agencies/:slug',
+    // CONTENT-004 (Sprint 10, added 2026-08-06) — previously blocked on real
+    // legal text from the Product Owner; now built with boilerplate content
+    // customized to this app's actual data collection (see TermsPage.tsx/
+    // PrivacyPage.tsx's own header comments for the "not final legal advice"
+    // caveat).
+    terms: '/terms',
+    privacy: '/privacy',
   },
   // Every authenticated role has its own independent dashboard route group
   // (post-Sprint-8 restructuring, 2026-08-04 — see decisions.md for the ADR
