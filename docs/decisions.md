@@ -999,6 +999,23 @@ Two real UX decisions for the idle timeout (duration; warn-then-sign-out vs. sil
 
 ---
 
+## ADR-037: One Supabase project serves dev/staging and production — no separate production project
+
+**Status:** Accepted
+**Date:** 2026-08-06
+
+**Decision:** Rental Hunt KE launches `v1.0.0` on the same Supabase project (`oqcaythakxgcpgfsqifu`) that's been used for development and Vercel preview deployments since Sprint 2, rather than provisioning a separate production project as `roadmap.md` §21 originally planned. There is no separate staging environment; local (`supabase start`) and this one hosted project are the only two tiers.
+
+**Context:** `roadmap.md` §21's Environment Promotion row documented "Local → Development/Staging (shared project) → Production (separate project, first used at Sprint 10)" from Sprint 0 onward, before real usage data existed. By Sprint 10, the existing project already carries real signed-up users, real agent-created listings, and the full migration history verified live (confirmed directly, `supabase migration list` — every migration through `20260805110000` already applied and matching local). Put to the developer directly rather than assumed: create a second project now, or launch on the one already running. Developer chose to reuse the existing project.
+
+**Rationale:** For a solo-developer MVP at this traffic scale, a second Supabase project adds real ongoing cost and operational surface (a second set of Auth/RLS/migration state to keep in sync, a second place secrets can drift, `coding-standards.md` §21's environment-variable discipline doubled) without a corresponding benefit yet — there's no team of engineers whose experiments need isolating from real users, which is the usual reason a separate production project exists. The existing project has already been running the full RLS/migration surface correctly since Sprint 2; there is no evidence it's unfit for production traffic, only that the original roadmap assumed a separation that hasn't been needed in practice.
+
+**Consequences:** Every migration merged to `main` from this point is live on the same database real users are on — there is no staging environment to rehearse a risky migration against first, only local (`supabase start`) and production. This raises the bar on migration review and on running `db reset`/local verification thoroughly before `db push`, a discipline this project has already followed every sprint (per `database.md` §13). Existing dev/test rows already on the project (a few manually-created test agencies/agents/properties from Sprints 6–9's own QA passes) are visible to real users starting at launch — the developer's explicit call (2026-08-06) is to leave them as-is rather than clean them up, revisited only if it becomes a real problem later. A future session choosing to split into a genuine separate production project is a new, explicit decision superseding this one, not a quiet reversal.
+
+**Related Documents:** `roadmap.md` §14 (Sprint 10 scope), §21 (Environment Promotion row, corrected in the same change as this ADR), `architecture.md` §19 (still describes Development/Staging/Production as a *future* possibility, not a current requirement — left unchanged, this ADR doesn't contradict it), `coding-standards.md` §21 (secret management — unaffected, still one set of `VITE_`-prefixed values, now serving both roles).
+
+---
+
 # Future ADR Process
 
 | Aspect | Rule |

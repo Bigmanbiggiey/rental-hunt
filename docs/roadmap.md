@@ -320,23 +320,24 @@ Requires Sprint 5 (`viewing_requests`/`viewing_status`, since a review's eligibi
 # 14. Sprint 10 - Production Launch
 
 ## Scope
-- Static & Legal Content (pre-launch prep, `user-stories.md` Epic 11, added 2026-08-05): `CONTENT-001`–`005` — How It Works (merged into the homepage 2026-08-05, no longer a separate About route), Contact form + admin review screen, Terms of Service, Privacy Policy, and a genuine 404 page. Folded into this sprint rather than given its own, since Terms/Privacy is a real launch blocker and the rest is small, low-risk static content. **Terms of Service and Privacy Policy content is blocked on the Product Owner supplying real legal/company text** — engineering does not draft binding legal content; this must be resolved before this sprint's DoD can close.
+- Static & Legal Content (pre-launch prep, `user-stories.md` Epic 11, added 2026-08-05): `CONTENT-001`–`005` — How It Works (merged into the homepage 2026-08-05, no longer a separate About route), Contact form + admin review screen, Terms of Service, Privacy Policy, and a genuine 404 page. Folded into this sprint rather than given its own, since Terms/Privacy is a real launch blocker and the rest is small, low-risk static content. **Updated 2026-08-06:** Terms/Privacy are no longer blocked — built with boilerplate content customized to this app's actual data collection, per the developer's explicit decision (`TermsPage.tsx`/`PrivacyPage.tsx`'s own header comments carry the same caveat: review/approval by the developer, ideally real legal counsel, before treated as final — engineering still hasn't drafted *binding* legal content, only a working starting point).
 - Production Build: final production bundle built and smoke-tested locally before deploy.
-- Deployment Validation: Vercel production environment configured with the production Supabase project's credentials (not the dev/staging project used through Sprints 1–9).
-- Database Migration: full migration history (`database.md` §13) replayed clean against the production Supabase project; seed data (§12) replaced with real launch-ready reference data (all 47 counties, a complete amenities list, real agency/agent accounts — not dev fixtures).
+- Deployment Validation: **updated 2026-08-06, ADR-037** — no separate production project; the existing Supabase project (already configured in Vercel since Sprint 2) serves production directly.
+- Database Migration: **updated 2026-08-06** — moot under ADR-037; the existing project's migration history is already fully applied and was verified directly (`supabase migration list` against the linked project, every migration through Sprint 9's `20260805110000` present). Reference data (all 47 counties, full amenities list) was also confirmed already complete via a direct read of the live project. Existing dev/test agency/agent/property rows from Sprints 6–9's own QA passes remain — developer's explicit call (2026-08-06) is to leave them, not clean them up before launch.
 - Environment Verification: all environment variables present and correct in the production environment; confirm no dev/staging secret is reachable from production and vice versa.
 - Smoke Testing: the golden path (register → search → view details → book a viewing; agent creates → verifies → confirms a booking; **added 2026-08-05:** a customer applies for an agency, an admin approves it, the new agent creates a listing) walked through against the live production environment immediately after deploy.
-- Monitoring: error logging (`coding-standards.md` §22) confirmed to be receiving events in production.
+- Monitoring: **updated 2026-08-06** — Sentry wired in (`shared/lib/sentry.ts`, `shared/lib/logger.ts`'s `error()` path now also reports), per `coding-standards.md` §22's already-documented "swap the transport" plan. Confirmed receiving events in production is still a pre-launch step (needs a real DSN in the Vercel environment and one deliberately-triggered test event).
 - Backup Strategy: confirm Supabase Cloud's automated backups/PITR are enabled on the production project (`database.md` §13's rollback backstop).
 - Release Checklist: see below.
 - Version 1.0 Launch: tag `v1.0.0` (`coding-standards.md` §23).
 
 ## Release Checklist
-- [ ] `CONTENT-001`–`005` (How It Works on the homepage, Contact + admin review, Terms, Privacy, 404 page) are built and Terms/Privacy contain real, Product-Owner-approved legal text — not placeholder copy.
+- [ ] `CONTENT-001`–`005` (How It Works on the homepage, Contact + admin review, Terms, Privacy, 404 page) are built. Terms/Privacy contain boilerplate customized to this app's real functionality (per the developer's 2026-08-06 decision) — the developer's own review/approval of that text is still recommended before `v1.0.0`, though no longer a hard DoD blocker the way real Product-Owner-supplied text originally was.
 - [ ] `AGENCY-001`–`005` (Sprint 9) are fully closed.
 - [ ] All Sprint 0–9 Definitions of Done remain true on the production build (no regression since Sprint 9 closed).
-- [ ] Every item in `requirements.md` §15 ("MVP Success Criteria") is verified true in production, not just staging.
-- [ ] Rollback plan (§21) is understood and has been rehearsed at least once against staging.
+- [ ] Every item in `requirements.md` §15 ("MVP Success Criteria") is verified true in production.
+- [ ] Rollback plan (§21) is understood — **updated 2026-08-06, ADR-037**: rehearsed against production directly (there is no separate staging environment to rehearse against first under the single-project decision), so this rehearsal should be a deliberately low-risk dry run (e.g. confirming the Vercel rollback UI/PITR access works), not a destructive test.
+- [ ] Sentry is confirmed receiving real events in production.
 - [ ] `v1.0.0` tagged and release notes published referencing the shipped `user-stories.md` scope.
 
 ---
@@ -464,7 +465,7 @@ A feature is done only when:
 | **Hotfixes** | Branch from `main`, fix, fast-tracked through the same Definition of Done (§20) and Code Review Checklist (`coding-standards.md` §26) — never skipped for urgency — then a `PATCH` version bump and immediate deploy. |
 | **Rollback process** | Application: Vercel's instant rollback to the previous deployment. Database: migrations are forward-only (`database.md` §13) — a bad migration is corrected by a new migration, with Supabase Cloud's Point-in-Time Recovery as the backstop for anything a forward-fix can't address in time. |
 | **Database migrations** | Applied via the Supabase CLI through CI/CD (`database.md` §13) — never manually against a shared environment. |
-| **Environment promotion** | Local (developer machine, `supabase start`) → Development/Staging (shared Supabase project, used Sprints 1–9) → Production (separate Supabase project, first used at Sprint 10) — matching the environment tiers `architecture.md` §19 already anticipates. |
+| **Environment promotion** | **Corrected 2026-08-06, ADR-037.** Two tiers, not three: Local (developer machine, `supabase start`) → the one hosted Supabase project (`oqcaythakxgcpgfsqifu`), used for development, Vercel previews, and — as of Sprint 10 — production itself. No separate production project was created; see ADR-037 for why. `architecture.md` §19's Development/Staging/Production list remains a documented *future* possibility, not a description of what Sprint 10 actually shipped. |
 
 ---
 

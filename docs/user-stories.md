@@ -951,10 +951,10 @@ Every story includes:
 **User Story:** As a guest, I want to read the platform's Terms of Service and Privacy Policy, so that I understand my rights, obligations, and what data is collected before using the platform.
 
 **Acceptance Criteria:**
-- Public `/terms` and `/privacy` routes exist and are linked from the footer.
-- Legal/company text is supplied by the Product Owner — engineering does not draft binding legal content.
-- Privacy Policy accurately describes real data collection (Supabase Auth, `profiles`, `favorites`, `viewing_requests`, and — once built — `contact_messages`).
-- Must exist before Sprint 9's `v1.0.0` production launch tag (`roadmap.md` §13).
+- Public `/terms` and `/privacy` routes exist and are linked from the footer. — **Done 2026-08-06** (`TermsPage.tsx`/`PrivacyPage.tsx`, `Footer.tsx`).
+- Legal/company text is supplied by the Product Owner — engineering does not draft binding legal content. — **Superseded 2026-08-06 by explicit developer decision:** engineering drafted boilerplate content customized to this app's actual functionality, as a working starting template — not final, lawyer-drafted legal text. Both pages carry a visible in-app notice saying so, and their own header comments say the same for a future reader. Real legal review remains recommended before this is relied on as binding, but is no longer a hard blocker to shipping the pages.
+- Privacy Policy accurately describes real data collection (Supabase Auth, `profiles`, `favorites`, `viewing_requests`, and — once built — `contact_messages`). — **Done 2026-08-06**, and extended to cover what didn't exist when this AC was written: `agencies` (self-service applications, social links) and `reviews` (Epic 12).
+- Must exist before Sprint 10's `v1.0.0` production launch tag (`roadmap.md` §14 — corrected 2026-08-06; this line originally said "Sprint 9," written before Sprint 9 was renumbered from Production Launch to Agency Marketplace).
 
 ---
 
