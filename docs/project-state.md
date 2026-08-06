@@ -10,6 +10,7 @@
 |---|---|
 | **Project Name** | Rental Hunt KE |
 | **Current Version** | `v0.1.0-dev` (pre-launch — semantic versioning per `coding-standards.md` §23; `v1.0.0` is reserved for MVP production launch) |
+| **Latest Local Commits (not yet pushed)** | `4f2a494`/`61df916`/`3d2d19d` (2026-08-06) — Sprint 10 kickoff: Terms/Privacy pages (`CONTENT-004`), Sentry monitoring, ADR-037. Full validation passed (lint/typecheck/394 tests/build) — see Current Task. Push pending explicit developer confirmation. |
 | **Current Sprint** | Sprint 9 — Agency Marketplace — **in progress (started 2026-08-05).** Inserted ahead of the original Sprint 9 (Production Launch, renumbered Sprint 10) by explicit developer decision — see `decisions.md` ADR-035/ADR-036. Implementation and automated testing complete locally (migration, entities, feature slices, pages, routes — `AGENCY-001`–`005` all built); **not yet committed, pushed, migrated to remote Supabase, or manually browser-walked-through** — those are separate, later, explicitly-requested steps per this project's established pattern (same as Sprint 6's own closure gap). |
 | **Current Phase** | Sprint 8 (Quality Assurance) and its follow-on manual pre-launch testing pass are both closed (2026-08-03) — two real bugs found and fixed there (role-unaware login redirect, missing password-visibility toggle — `c90dd55`/`7b0892c`). Sprint 9 (Agency Marketplace) opened 2026-08-05 instead of proceeding straight to the old Sprint 9/new Sprint 10 (Production Launch), which remains paused pending both Sprint 9's own closure and three unresolved developer decisions (new Supabase production project/tier, real launch reference data, error monitoring). |
 | **Overall Progress** | 9 / 11 sprints fully closed (**82%** by sprint count — denominator grew from 10 to 11 with Sprint 9's insertion, 2026-08-05) |
@@ -184,6 +185,21 @@ New `entities/review/` slice (types/mapper/repository — `listForAgency`/`listF
 ---
 
 # Current Task
+
+| Field | Value |
+|---|---|
+| **Task ID** | Sprint 10 (Production Launch) kickoff — ADR-037, Terms/Privacy pages (`CONTENT-004`), Sentry error monitoring |
+| **Task Name** | Continuation of a prior session's uncommitted work, found in the working tree at this session's start: (1) `docs/decisions.md` ADR-037 — launch on the existing Supabase project (`oqcaythakxgcpgfsqifu`) rather than provisioning a separate production project, with `roadmap.md` §14/§21 corrected to match; (2) `TermsPage.tsx`/`PrivacyPage.tsx` — boilerplate legal content customized to the app's real data collection, unblocking `CONTENT-004` (previously hard-blocked on Product-Owner-supplied text), linked from the footer; (3) `shared/lib/sentry.ts` + `@sentry/react` — minimal error-capture Sentry integration wired into `logger.error()` per `coding-standards.md` §22's pre-documented "swap the transport" plan, gated on `VITE_SENTRY_DSN` (unset locally). This session's own job was to validate, commit, and prepare to push — not to design or reconsider any of it. |
+| **Status** | Complete and committed. Full validation run this session against a real local Supabase stack (`npx supabase start` + `db reset`, both freshly verified after this session accidentally started the stack from the wrong working directory first — caught via the `supabase_*_PROJECTS`-named containers, stopped/removed, restarted correctly): `npm run lint` (0 errors, 44 pre-existing warnings, none new), `npm run typecheck` clean, `npm run test -- --run` **394/394 passing across 80 files** (no failures, no flakes this run), `npm run build` clean. Committed as 3 atomic commits: `4f2a494` (Terms/Privacy pages), `61df916` (Sentry monitoring), `3d2d19d` (docs — ADR-037, `CONTENT-004` AC closure, `coding-standards.md` §22 row). **Not yet pushed to `origin/main`** — pending explicit developer confirmation. |
+| **Started** | 2026-08-06 |
+| **Completed** | 2026-08-06 (commit); push still pending developer confirmation |
+| **Assigned To** | Claude Code |
+| **Dependencies** | None new — `CONTENT-004` depends on the routing/footer infrastructure already in place; Sentry depends on nothing else in the app. |
+| **Notes** | No code changes were made to the inherited work itself (it was already correct) beyond validating it — this session's contribution was catching and fixing its own Supabase-stack startup mistake, running the full validation suite for real (previously untested this session), and splitting the accumulated working-tree diff into atomic commits following this project's established pattern (feature commits, then one consolidated docs commit). `VITE_SENTRY_DSN` is not yet set in any environment (including Vercel production) — Sentry will remain a no-op until a real DSN is created and added, tracked in Sprint 10's own Release Checklist (`roadmap.md` §14). |
+
+---
+
+## Sprint 9 (Agency Marketplace) — full implementation: self-service agency onboarding, public Agency Profile Page, reviews/ratings, admin overview drill-downs, plus the nav-back-link and mobile map/booking-dialog fixes (previous task, 2026-08-05)
 
 | Field | Value |
 |---|---|
@@ -736,6 +752,10 @@ _Append one entry per session, most recent last. Never edit or delete a prior en
 ---
 
 # Next Recommended Action
+
+**Immediate next step (2026-08-06): push `4f2a494`/`61df916`/`3d2d19d` to `origin/main`, pending developer confirmation** (asked for explicitly, not assumed — see Current Task). Nothing further to deploy for the Terms/Privacy pages (pure static frontend content); Sentry needs a real `VITE_SENTRY_DSN` added to the Vercel production environment before it will actually report anything, tracked in Sprint 10's Release Checklist (`roadmap.md` §14).
+
+**Everything below this point predates this push and remains accurate as its own historical record.**
 
 **Immediate next step (2026-08-05): Sprint 9 (Agency Marketplace) closure.** Implementation and automated testing are complete (see the Active Sprint entry above and `decisions.md` ADR-035/ADR-036) — what's left, in order: (1) a manual two-actor browser walkthrough (a customer applies for an agency, an admin approves it, the applicant's new `/agent-dashboard` access and `agents` row are confirmed, the agency's public page renders with real data, a customer reviews a completed booking and the rating updates); (2) commit + push; (3) push the new migration (`20260805110000_agency_marketplace.sql`) to the remote Supabase project and verify it live, same method as every prior sprint; (4) deploy and verify the frontend live. None of these four have been done yet this session — per this project's established pattern, they're separate, explicitly-requested steps, not assumed.
 
