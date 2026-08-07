@@ -489,6 +489,135 @@ describe('viewing_requests RLS (integration, local Supabase)', () => {
     expect(adminDelete.error).toBeNull();
   });
 
+  // Security-review regression (decisions.md ADR-038, migration
+  // 20260807090000_security_hardening.sql): `viewing_requests_update_own_agent`
+  // checks `agent_id` ownership but never constrained `customer_id`/
+  // `property_id`/`agent_id` themselves — an agent could rewrite
+  // `customer_id` on a request they control to an arbitrary profile id and
+  // then read that profile via `profiles_select_own_customers_by_agent`
+  // (agent_dashboard.sql), including an admin/moderator's profile.
+  it('an agent cannot rewrite customer_id/property_id/agent_id on a viewing request they control', async () => {
+    const customer = await signUpActor('customerN');
+    const victim = await signUpActor('customerVictim');
+    createdClients.push(customer.client, victim.client);
+    const prop = await property(AVAILABLE_SLUG);
+    const otherProp = await property(OCCUPIED_SLUG);
+
+    const agentActor = await signUpActor('agentD', 'agent');
+    createdClients.push(agentActor.client);
+    const { data: seededAgent } = await serviceClient
+      .from('agents')
+      .select('agency_id')
+      .eq('id', prop.agent_id)
+      .single();
+    const { data: ownAgent } = await serviceClient
+      .from('agents')
+      .insert({ profile_id: agentActor.userId, agency_id: seededAgent!.agency_id })
+      .select('id')
+      .single();
+
+    const { data: created } = await customer.client
+      .from('viewing_requests')
+      .insert({
+        customer_id: customer.userId,
+        property_id: prop.id,
+        agent_id: ownAgent!.id,
+        requested_date: tomorrow(),
+        requested_time: '10:00',
+      })
+      .select('id')
+      .single();
+
+    const rewriteCustomer = await agentActor.client
+      .from('viewing_requests')
+      .update({ customer_id: victim.userId })
+      .eq('id', created!.id)
+      .select('customer_id')
+      .single();
+    expect(rewriteCustomer.error).not.toBeNull();
+
+    const rewriteProperty = await agentActor.client
+      .from('viewing_requests')
+      .update({ property_id: otherProp.id })
+      .eq('id', created!.id)
+      .select('property_id')
+      .single();
+    expect(rewriteProperty.error).not.toBeNull();
+
+    const check = await serviceClient
+      .from('viewing_requests')
+      .select('customer_id, property_id')
+      .eq('id', created!.id)
+      .single();
+    expect(check.data?.customer_id).toBe(customer.userId);
+    expect(check.data?.property_id).toBe(prop.id);
+
+    // Confirms the fix actually closes the read path, not just the write:
+    // the agent must still be unable to see the victim's profile.
+    const profileLeak = await agentActor.client.from('profiles').select('id').eq('id', victim.userId).maybeSingle();
+    expect(profileLeak.data).toBeNull();
+  });
+
+  // Security-review regression: `viewing_requests_update_own_agent` placed
+  // no restriction at all on `status` transitions — an agent could flip a
+  // request straight from 'pending' to 'completed', skipping 'confirmed'.
+  it('an agent cannot skip the confirmed step and jump a request straight from pending to completed', async () => {
+    const customer = await signUpActor('customerO');
+    createdClients.push(customer.client);
+    const prop = await property(AVAILABLE_SLUG);
+
+    const agentActor = await signUpActor('agentE', 'agent');
+    createdClients.push(agentActor.client);
+    const { data: seededAgent } = await serviceClient
+      .from('agents')
+      .select('agency_id')
+      .eq('id', prop.agent_id)
+      .single();
+    const { data: ownAgent } = await serviceClient
+      .from('agents')
+      .insert({ profile_id: agentActor.userId, agency_id: seededAgent!.agency_id })
+      .select('id')
+      .single();
+
+    const { data: created } = await customer.client
+      .from('viewing_requests')
+      .insert({
+        customer_id: customer.userId,
+        property_id: prop.id,
+        agent_id: ownAgent!.id,
+        requested_date: tomorrow(),
+        requested_time: '11:00',
+      })
+      .select('id')
+      .single();
+
+    const skipToCompleted = await agentActor.client
+      .from('viewing_requests')
+      .update({ status: 'completed', completed_at: new Date().toISOString() })
+      .eq('id', created!.id)
+      .select('status')
+      .single();
+    expect(skipToCompleted.error).not.toBeNull();
+
+    // The legitimate path — confirm, then complete — still works.
+    const confirm = await agentActor.client
+      .from('viewing_requests')
+      .update({ status: 'confirmed', confirmed_at: new Date().toISOString() })
+      .eq('id', created!.id)
+      .select('status')
+      .single();
+    expect(confirm.error).toBeNull();
+
+    const complete = await agentActor.client
+      .from('viewing_requests')
+      .update({ status: 'completed', completed_at: new Date().toISOString() })
+      .eq('id', created!.id)
+      .select('status')
+      .single();
+    expect(complete.error).toBeNull();
+    expect(complete.data?.status).toBe('completed');
+  });
+
   it('a guest has no access to viewing_requests at all', async () => {
     const guest = createClient(SUPABASE_URL, ANON_KEY, { auth: { persistSession: false } });
     const result = await guest.from('viewing_requests').select('id').limit(1);

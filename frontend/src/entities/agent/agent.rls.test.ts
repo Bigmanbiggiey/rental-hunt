@@ -87,4 +87,25 @@ describe('agents RLS (integration, local Supabase, Sprint 6)', () => {
     const check = await serviceClient.from('agents').select('bio').eq('id', agentE.agentId).single();
     expect(check.data?.bio).not.toBe('Hijacked.');
   });
+
+  // Security-review regression (decisions.md ADR-038, migration
+  // 20260807090000_security_hardening.sql): `agents_update_own_agent`
+  // (property_discovery.sql) checks row ownership but never constrained
+  // `agency_id` — an agent could reassign themselves into any other
+  // agency and inherit write access to its properties/images/storage.
+  it('an agent cannot reassign themselves to a different agency by updating agency_id', async () => {
+    const agentF = await signUpAgent('agentF', NAIROBI_HOMES_AGENCY_ID);
+    createdClients.push(agentF.client);
+
+    const attempt = await agentF.client
+      .from('agents')
+      .update({ agency_id: KIAMBU_ESTATES_AGENCY_ID })
+      .eq('id', agentF.agentId)
+      .select('agency_id')
+      .single();
+    expect(attempt.error).not.toBeNull();
+
+    const check = await serviceClient.from('agents').select('agency_id').eq('id', agentF.agentId).single();
+    expect(check.data?.agency_id).toBe(NAIROBI_HOMES_AGENCY_ID);
+  });
 });
