@@ -1,7 +1,11 @@
 import { z } from 'zod';
+import { isHttpUrl } from '@/shared/lib';
 
+// `.url()` alone accepts `javascript:`/`data:` URIs (syntactically valid,
+// but they execute as script when rendered as an href — found via the
+// Sprint 10 security review). `isHttpUrl` restricts the scheme.
 const urlField = z
-  .union([z.string().trim().url('Enter a valid URL.'), z.literal('')])
+  .union([z.string().trim().url('Enter a valid URL.').refine(isHttpUrl, 'URL must start with http:// or https://'), z.literal('')])
   .optional()
   .transform((value) => value || undefined);
 

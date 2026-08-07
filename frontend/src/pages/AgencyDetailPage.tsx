@@ -12,6 +12,7 @@ import {
 import { useFavoriteIds, useToggleFavorite } from '@/features/favorites';
 import { PropertyCard, PropertyCardSkeleton } from '@/entities/property';
 import { Alert, AlertDescription, Avatar, AvatarFallback, Button, EmptyState, Rating, Skeleton } from '@/shared/ui';
+import { isHttpUrl } from '@/shared/lib';
 import { NotFoundPage } from './NotFoundPage';
 
 const REVIEWS_PAGE_SIZE = 10;
@@ -74,7 +75,7 @@ function AgencyDetailPage() {
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-4">
           <Avatar className="size-16">
-            {agency.logoUrl ? (
+            {agency.logoUrl && isHttpUrl(agency.logoUrl) ? (
               <img src={agency.logoUrl} alt="" className="size-full object-cover" />
             ) : (
               <AvatarFallback>{initials(agency.name)}</AvatarFallback>
@@ -91,7 +92,10 @@ function AgencyDetailPage() {
           {agency.phone && <p className="text-body-sm text-muted-foreground">{agency.phone}</p>}
           {agency.email && <p className="text-body-sm text-muted-foreground">{agency.email}</p>}
           <div className="flex items-center gap-2 sm:justify-start">
-            {SOCIAL_ICONS.filter(({ key }) => agency.socialLinks[key]).map(({ key, icon: Icon, label }) => (
+            {SOCIAL_ICONS.filter(({ key }) => {
+              const url = agency.socialLinks[key];
+              return url && isHttpUrl(url);
+            }).map(({ key, icon: Icon, label }) => (
               <a
                 key={key}
                 href={agency.socialLinks[key]}
